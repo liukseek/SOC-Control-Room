@@ -1,0 +1,25 @@
+
+# Maven
+target/
+**/target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Java
+*.class
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+
