@@ -226,9 +226,15 @@ Main classes:
 ## Project Structure
 
 ```text
-soc-control-room/
+SOC-Control-Room/
 │
 ├── pom.xml
+├── compila.bat
+├── avvia-server.bat
+├── avvia-client.bat
+├── avvia-test-locale.bat
+├── launcher/
+│   └── src/Launcher.java         (one-click launcher window for Windows and macOS)
 │
 ├── soc-common/
 │   └── src/
@@ -272,7 +278,7 @@ soc-control-room/
 | TCP Sockets | Network communication |
 | JSON | Message serialization format |
 | Jackson | JSON processing |
-| Maven | Build and dependency management |
+| Maven (with the Shade plugin) | Build, dependency management and runnable jars |
 | JUnit 5 | Unit testing |
 | Git | Version control |
 
@@ -366,9 +372,9 @@ These principles help prevent clients from manipulating game state or accessing 
 
 Before building the project, make sure the following software is installed:
 
-- JDK 21 or later.
-- Apache Maven.
-- Git.
+- JDK 21 or later (for example Temurin from https://adoptium.net).
+- Apache Maven 3.9 or later. On Windows it is optional: `compila.bat` downloads Maven 3.9.9 into the `.maven` folder when it is missing.
+- Git, only to clone the repository.
 
 ### Clone the Repository
 
@@ -379,24 +385,35 @@ cd SOC-Control-Room
 
 ### Build the Project
 
-Run the following command from the project root directory:
+On Windows, double-click `compila.bat`, or run the following command from the project root directory:
 
 ```bash
-mvn clean install
+mvn clean package
 ```
 
 Maven will:
 
 1. Clean previous build artifacts.
-2. Compile the project modules.
-3. Run the available tests.
-4. Resolve dependencies.
-5. Install the modules into the local Maven repository.
+2. Resolve dependencies.
+3. Compile the project modules.
+4. Run the available tests (`compila.bat` skips them with `-DskipTests`).
+5. Create the runnable jars with the Maven Shade plugin:
+
+| Jar | Description |
+|---|---|
+| `soc-server/target/soc-server-1.0.0-SNAPSHOT.jar` | Server (includes `soc-common` and Jackson). |
+| `soc-client/target/soc-client-1.0.0-SNAPSHOT.jar` | Client (includes `soc-common` and Jackson). |
 
 A successful build should finish with:
 
 ```text
 BUILD SUCCESS
+```
+
+To run only the tests (protocol serialization tests in `soc-common`):
+
+```bash
+mvn test
 ```
 
 ---
@@ -409,29 +426,45 @@ The repository root contains ready-to-use batch files:
 
 | File | Description |
 |---|---|
-| `compila.bat` | Builds the project with Maven (`mvn clean package`), creating runnable jars. If Maven is not installed, it downloads it automatically into the `.maven` folder (only a JDK 21+ is required). |
+| `compila.bat` | Builds the project with Maven (`mvn clean package -DskipTests`), creating the runnable jars. If Maven is not installed, it downloads it automatically into the `.maven` folder (only a JDK 21+ is required). |
 | `avvia-server.bat` | Starts the server (builds first if needed). Accepts the server arguments, e.g. `avvia-server.bat --min=4`. |
 | `avvia-client.bat` | Starts a client window (builds first if needed). |
-| `avvia-test-locale.bat` | Starts the server and three clients on the same PC for a quick local test. |
+| `avvia-test-locale.bat` | Starts the server (with the admin panel) and three clients on the same PC for a quick local test. |
 
 After changing the code, run `compila.bat` again to rebuild the jars.
 
+### One-click launcher (Windows and macOS)
+
+`launcher/src/Launcher.java` is a small Swing window with three buttons: play (client), start the server, and local test (server plus three clients). Compile it into a `SOC-Control-Room.jar` placed in the project root, or next to `soc-server.jar` and `soc-client.jar`:
+
+```bash
+javac --release 21 -d out launcher/src/Launcher.java
+jar cfe SOC-Control-Room.jar Launcher -C out .
+```
+
+Double-click the jar on Windows or macOS (JDK/JRE 21+ required). It looks for `soc-server.jar` and `soc-client.jar` in its own folder, then for the jars in `soc-server/target` and `soc-client/target`.
+
+### Running without the launchers
+
+Any platform with Java 21+ can start the two components directly from the jars.
 
 SOC: CONTROL ROOM consists of two independently launched components.
 
 ### 1. Start the Server
 
-Run the `ServerMain` class located in:
-
-```text
-soc-server/src/main/java/it/soc/server/ServerMain.java
+```bash
+java -jar soc-server/target/soc-server-1.0.0-SNAPSHOT.jar
 ```
+
+During development you can also run the `ServerMain` class located in `soc-server/src/main/java/it/soc/server/ServerMain.java` from your IDE.
 
 The server listens for incoming TCP connections on port:
 
 ```text
 1234
 ```
+
+On start it prints `Server in ascolto sulla porta 1234`.
 
 When a graphical environment is available, the **administrative control panel** opens automatically. It shows the session phase and timer, the exfiltration level, the connected operators (roles can be revealed with *Mostra ruoli*), the server log and the configuration; it can also start or stop a session.
 
@@ -448,11 +481,11 @@ Keep the server running while players connect.
 
 ### 2. Start a Client
 
-Run the `ClientMain` class located in:
-
-```text
-soc-client/src/main/java/it/soc/client/ClientMain.java
+```bash
+java -jar soc-client/target/soc-client-1.0.0-SNAPSHOT.jar
 ```
+
+During development you can also run the `ClientMain` class located in `soc-client/src/main/java/it/soc/client/ClientMain.java` from your IDE.
 
 The connection interface allows the player to specify:
 
@@ -465,7 +498,7 @@ The default server port is `1234`.
 
 Launch additional client instances and connect them to the same server. At least three players are needed to start a session. The first player in the lobby is the host and starts the session with **AVVIA SESSIONE**.
 
-For clients running on different computers, use the server computer's network IP address rather than `localhost`.
+For clients running on different computers, use the server computer's network IP address rather than `localhost`. Copy `soc-client-1.0.0-SNAPSHOT.jar` to the other computers and run it with `java -jar` (JDK/JRE 21+).
 
 Make sure the server port is reachable through the local network and that firewall rules allow the connection.
 
@@ -559,9 +592,7 @@ Please keep changes consistent with the existing Maven module structure and codi
 
 ## License
 
-No license has been specified yet.
-
-Until a license is added to the repository, all rights remain with the copyright holder.
+This project is released under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ---
 
