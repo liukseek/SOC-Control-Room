@@ -1,7 +1,38 @@
+<div align="center">
+
+<br>
 
 # SOC: CONTROL ROOM
 
+### `INVESTIGATE  //  ANALYZE  //  IDENTIFY`
+
 **A multiplayer cybersecurity simulation built with Java.**
+
+<br>
+
+![Java](https://img.shields.io/badge/Java-21-1f6feb?style=for-the-badge&labelColor=0d1117)
+![Swing](https://img.shields.io/badge/GUI-Swing-1f6feb?style=for-the-badge&labelColor=0d1117)
+![TCP](https://img.shields.io/badge/Network-TCP_Sockets-1f6feb?style=for-the-badge&labelColor=0d1117)
+![Maven](https://img.shields.io/badge/Build-Maven-1f6feb?style=for-the-badge&labelColor=0d1117)
+![JUnit](https://img.shields.io/badge/Tests-JUnit_5-1f6feb?style=for-the-badge&labelColor=0d1117)
+![License](https://img.shields.io/badge/License-MIT-2ea043?style=for-the-badge&labelColor=0d1117)
+![Status](https://img.shields.io/badge/Status-Work_in_Progress-d29922?style=for-the-badge&labelColor=0d1117)
+
+<br>
+
+[Overview](#overview) &nbsp;|&nbsp;
+[Gameplay](#gameplay) &nbsp;|&nbsp;
+[Features](#features) &nbsp;|&nbsp;
+[Architecture](#architecture) &nbsp;|&nbsp;
+[Protocol](#communication-protocol) &nbsp;|&nbsp;
+[Installation](#installation) &nbsp;|&nbsp;
+[Roadmap](#roadmap)
+
+<br>
+
+</div>
+
+---
 
 SOC: CONTROL ROOM is a multiplayer project inspired by the operations of a Security Operations Center (SOC).
 
@@ -9,7 +40,30 @@ The application simulates an environment in which players take on different role
 
 Built with Java, Swing and TCP socket communication, the project combines cybersecurity concepts, network programming and interactive gameplay.
 
+> [!NOTE]
 > **Project status:** Work in progress.
+
+<br>
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Gameplay](#gameplay)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Technologies](#technologies)
+- [Communication Protocol](#communication-protocol)
+- [Security Design](#security-design)
+- [Installation](#installation)
+- [Running the Application](#running-the-application)
+- [Development Status](#development-status)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+- [Project Information](#project-information)
+
+<br>
 
 ---
 
@@ -22,55 +76,50 @@ Players connect to a central server and participate in a simulated security inci
 The game revolves around two opposing sides:
 
 | Role | Objective |
-|---|---|
+|:---|:---|
 | **SOC Analyst** | Investigate suspicious activity and identify the insider. |
 | **Insider** | Remain undetected while attempting to interfere with the investigation. |
 
 The experience focuses on teamwork, observation, decision-making and information analysis.
 
-All scenarios and actions are simulated. The application does not perform attacks against real systems.
+> [!IMPORTANT]
+> All scenarios and actions are simulated. The application does not perform attacks against real systems.
+
+<br>
+
+---
 
 ## Gameplay
 
-A game session is designed to last approximately **5–6 minutes**.
+A game session is designed to last approximately **5-6 minutes**.
 
 The planned gameplay cycle consists of the following phases:
 
-### 1. Connection
+| Phase | Name | Description |
+|:---:|:---|:---|
+| **01** | Connection | Players launch the client application and connect to the central server using its IP address and their chosen nickname. |
+| **02** | Lobby | Connected players enter a shared waiting room where they can see the other participants. |
+| **03** | Role Assignment | The server assigns each player a role. Role information is private and must only be disclosed to the appropriate client. |
+| **04** | Investigation | SOC Analysts examine simulated information and investigate suspicious activity. |
+| **05** | Events | Unexpected events can occur during the session, introducing new information or changing the investigation. |
+| **06** | Voting | Players submit their suspicions and vote to identify the potential insider. |
+| **07** | Results | The server evaluates the outcome and determines which side achieved its objective. |
 
-Players launch the client application and connect to the central server using its IP address and their chosen nickname.
-
-### 2. Lobby
-
-Connected players enter a shared waiting room where they can see the other participants.
-
-### 3. Role Assignment
-
-The server assigns each player a role.
-
-Role information is private and must only be disclosed to the appropriate client.
-
-### 4. Investigation
-
-SOC Analysts examine simulated information and investigate suspicious activity.
-
-### 5. Events
-
-Unexpected events can occur during the session, introducing new information or changing the investigation.
-
-### 6. Voting
-
-Players submit their suspicions and vote to identify the potential insider.
-
-### 7. Results
-
-The server evaluates the outcome and determines which side achieved its objective.
+```text
+ [01] CONNECTION --> [02] LOBBY --> [03] ROLES --> [04] INVESTIGATION --> [05] EVENTS --> [06] VOTING --> [07] RESULTS
+```
 
 *Gameplay mechanics are currently under development.*
+
+<br>
 
 ---
 
 ## Features
+
+<table>
+<tr>
+<td width="50%" valign="top">
 
 ### Currently Implemented
 
@@ -84,6 +133,9 @@ The server evaluates the outcome and determines which side achieved its objectiv
 - Protocol unit tests.
 - Graphical lobby interface.
 
+</td>
+<td width="50%" valign="top">
+
 ### Planned Features
 
 - Multiplayer game session management.
@@ -96,6 +148,12 @@ The server evaluates the outcome and determines which side achieved its objectiv
 - Game result calculation.
 - Administrative control panel.
 
+</td>
+</tr>
+</table>
+
+<br>
+
 ---
 
 ## Architecture
@@ -107,7 +165,7 @@ The server is responsible for managing connected clients and coordinating commun
 The project is divided into three Maven modules:
 
 | Module | Responsibility |
-|---|---|
+|:---|:---|
 | `soc-common` | Shared classes and communication protocol |
 | `soc-server` | Server-side networking and connection management |
 | `soc-client` | Player application and graphical interface |
@@ -135,7 +193,10 @@ The project is divided into three Maven modules:
      +---------+    +---------+    +---------+
 ```
 
-### `soc-common`
+<details open>
+<summary><b><code>soc-common</code></b> &nbsp;-&nbsp; shared classes and protocol</summary>
+
+<br>
 
 Contains the classes shared between the client and server.
 
@@ -149,12 +210,17 @@ Responsibilities:
 Main classes:
 
 | Class | Description |
-|---|---|
+|:---|:---|
 | `Message` | Represents a communication message. |
 | `MessageType` | Defines the available message types. |
 | `Protocol` | Handles JSON encoding and decoding. |
 
-### `soc-server`
+</details>
+
+<details open>
+<summary><b><code>soc-server</code></b> &nbsp;-&nbsp; central server component</summary>
+
+<br>
 
 The server is the central component of the application.
 
@@ -170,12 +236,17 @@ Responsibilities:
 Main classes:
 
 | Class | Description |
-|---|---|
+|:---|:---|
 | `ServerMain` | Starts the TCP server. |
 | `ClientHandler` | Handles communication with an individual client. |
 | `ConnectionManager` | Tracks connected clients and registered players. |
 
-### `soc-client`
+</details>
+
+<details open>
+<summary><b><code>soc-client</code></b> &nbsp;-&nbsp; player desktop application</summary>
+
+<br>
 
 The client is the desktop application used by players.
 
@@ -190,11 +261,15 @@ Responsibilities:
 Main classes:
 
 | Class | Description |
-|---|---|
+|:---|:---|
 | `ClientMain` | Application entry point. |
 | `ConnectionWindow` | Connection and login interface. |
 | `NetworkClient` | Manages TCP communication. |
 | `LobbyWindow` | Displays the multiplayer lobby. |
+
+</details>
+
+<br>
 
 ---
 
@@ -238,12 +313,14 @@ soc-control-room/
                 └── LobbyWindow.java
 ```
 
+<br>
+
 ---
 
 ## Technologies
 
 | Technology | Purpose |
-|---|---|
+|:---|:---|
 | Java 21 | Main programming language |
 | Java Swing | Graphical user interface |
 | TCP Sockets | Network communication |
@@ -252,6 +329,8 @@ soc-control-room/
 | Maven | Build and dependency management |
 | JUnit 5 | Unit testing |
 | Git | Version control |
+
+<br>
 
 ---
 
@@ -276,7 +355,7 @@ Each message follows a shared structure:
 ```
 
 | Field | Description |
-|---|---|
+|:---|:---|
 | `type` | Identifies the message type. |
 | `sender` | Identifies the message sender. |
 | `content` | Contains the message payload. |
@@ -286,7 +365,7 @@ Each message follows a shared structure:
 The shared protocol currently defines the following message types:
 
 | Message | Description |
-|---|---|
+|:---|:---|
 | `CONNECT` | Connection request |
 | `DISCONNECT` | Client disconnection |
 | `JOIN_LOBBY` | Request to join the lobby |
@@ -301,6 +380,8 @@ The shared protocol currently defines the following message types:
 | `PING` | Connection check |
 | `PONG` | Connection check response |
 
+<br>
+
 ---
 
 ## Security Design
@@ -311,13 +392,17 @@ The server is intended to remain the single source of truth for all game-related
 
 Important design principles include:
 
-- **Server-side game state:** Game state must be controlled by the server.
-- **Private information:** Secret roles and confidential information must not be exposed to unauthorized clients.
-- **Action validation:** Player actions must be validated by the server.
-- **Client isolation:** Clients should only receive the information required for their role.
-- **Controlled simulation:** All cybersecurity scenarios are fictional and take place within the application.
+| Principle | Description |
+|:---|:---|
+| **Server-side game state** | Game state must be controlled by the server. |
+| **Private information** | Secret roles and confidential information must not be exposed to unauthorized clients. |
+| **Action validation** | Player actions must be validated by the server. |
+| **Client isolation** | Clients should only receive the information required for their role. |
+| **Controlled simulation** | All cybersecurity scenarios are fictional and take place within the application. |
 
 These principles help prevent clients from manipulating game state or accessing information they should not receive.
+
+<br>
 
 ---
 
@@ -359,6 +444,8 @@ A successful build should finish with:
 ```text
 BUILD SUCCESS
 ```
+
+<br>
 
 ---
 
@@ -405,36 +492,41 @@ For clients running on different computers, use the server computer's network IP
 
 Make sure the server port is reachable through the local network and that firewall rules allow the connection.
 
+<br>
+
 ---
 
 ## Development Status
 
-**SOC: CONTROL ROOM is actively under development.**
+> [!NOTE]
+> **SOC: CONTROL ROOM is actively under development.**
 
 | Component | Status |
-|---|---|
-| Maven multi-module structure | Completed |
-| Shared communication protocol | Completed |
-| JSON serialization and deserialization | Completed |
-| Protocol unit tests | Implemented |
-| TCP server | Implemented |
-| Client connection handling | Implemented |
-| Player registration | Implemented |
-| TCP client | Implemented |
-| Connection GUI | Implemented |
-| Lobby GUI | Implemented |
-| Lobby integration | In progress |
-| Real-time lobby synchronization | In progress |
-| Game management | Planned |
-| Role assignment | Planned |
-| Analyst interface | Planned |
-| Insider interface | Planned |
-| Investigation mechanics | Planned |
-| Evidence collection | Planned |
-| Random events | Planned |
-| Voting system | Planned |
-| Game results | Planned |
-| Administrative interface | Planned |
+|:---|:---:|
+| Maven multi-module structure | ![Completed](https://img.shields.io/badge/-Completed-2ea043?style=flat-square) |
+| Shared communication protocol | ![Completed](https://img.shields.io/badge/-Completed-2ea043?style=flat-square) |
+| JSON serialization and deserialization | ![Completed](https://img.shields.io/badge/-Completed-2ea043?style=flat-square) |
+| Protocol unit tests | ![Implemented](https://img.shields.io/badge/-Implemented-2ea043?style=flat-square) |
+| TCP server | ![Implemented](https://img.shields.io/badge/-Implemented-2ea043?style=flat-square) |
+| Client connection handling | ![Implemented](https://img.shields.io/badge/-Implemented-2ea043?style=flat-square) |
+| Player registration | ![Implemented](https://img.shields.io/badge/-Implemented-2ea043?style=flat-square) |
+| TCP client | ![Implemented](https://img.shields.io/badge/-Implemented-2ea043?style=flat-square) |
+| Connection GUI | ![Implemented](https://img.shields.io/badge/-Implemented-2ea043?style=flat-square) |
+| Lobby GUI | ![Implemented](https://img.shields.io/badge/-Implemented-2ea043?style=flat-square) |
+| Lobby integration | ![In progress](https://img.shields.io/badge/-In_progress-d29922?style=flat-square) |
+| Real-time lobby synchronization | ![In progress](https://img.shields.io/badge/-In_progress-d29922?style=flat-square) |
+| Game management | ![Planned](https://img.shields.io/badge/-Planned-6e7681?style=flat-square) |
+| Role assignment | ![Planned](https://img.shields.io/badge/-Planned-6e7681?style=flat-square) |
+| Analyst interface | ![Planned](https://img.shields.io/badge/-Planned-6e7681?style=flat-square) |
+| Insider interface | ![Planned](https://img.shields.io/badge/-Planned-6e7681?style=flat-square) |
+| Investigation mechanics | ![Planned](https://img.shields.io/badge/-Planned-6e7681?style=flat-square) |
+| Evidence collection | ![Planned](https://img.shields.io/badge/-Planned-6e7681?style=flat-square) |
+| Random events | ![Planned](https://img.shields.io/badge/-Planned-6e7681?style=flat-square) |
+| Voting system | ![Planned](https://img.shields.io/badge/-Planned-6e7681?style=flat-square) |
+| Game results | ![Planned](https://img.shields.io/badge/-Planned-6e7681?style=flat-square) |
+| Administrative interface | ![Planned](https://img.shields.io/badge/-Planned-6e7681?style=flat-square) |
+
+<br>
 
 ---
 
@@ -442,7 +534,7 @@ Make sure the server port is reachable through the local network and that firewa
 
 The development roadmap is divided into several stages.
 
-### Phase 1 — Core Infrastructure
+### Phase 1 - Core Infrastructure
 
 - [x] Create Maven multi-module structure.
 - [x] Implement shared JSON protocol.
@@ -452,7 +544,7 @@ The development roadmap is divided into several stages.
 - [x] Create initial lobby interface.
 - [ ] Complete lobby synchronization.
 
-### Phase 2 — Game Infrastructure
+### Phase 2 - Game Infrastructure
 
 - [ ] Implement game session management.
 - [ ] Implement player state management.
@@ -460,7 +552,7 @@ The development roadmap is divided into several stages.
 - [ ] Implement game phases.
 - [ ] Implement server-side game validation.
 
-### Phase 3 — Gameplay
+### Phase 3 - Gameplay
 
 - [ ] Develop Analyst interface.
 - [ ] Develop Insider interface.
@@ -470,7 +562,7 @@ The development roadmap is divided into several stages.
 - [ ] Implement voting mechanics.
 - [ ] Implement victory conditions.
 
-### Phase 4 — Administration and Polish
+### Phase 4 - Administration and Polish
 
 - [ ] Develop administrative control panel.
 - [ ] Add session configuration.
@@ -478,6 +570,8 @@ The development roadmap is divided into several stages.
 - [ ] Improve network reliability.
 - [ ] Add complete game statistics.
 - [ ] Finalize graphical interfaces.
+
+<br>
 
 ---
 
@@ -495,30 +589,43 @@ If you want to contribute:
 
 Please keep changes consistent with the existing Maven module structure and coding conventions.
 
+<br>
+
 ---
 
 ## License
 
-No license has been specified yet.
+This project is released under the **MIT License**.
 
-Until a license is added to the repository, all rights remain with the copyright holder.
+See the [LICENSE](LICENSE) file for the full text.
+
+<br>
 
 ---
 
 ## Project Information
 
 | | |
-|---|---|
-| Project | SOC: CONTROL ROOM |
-| Repository | [liukseek/SOC-Control-Room](https://github.com/liukseek/SOC-Control-Room) |
-| Language | Java |
-| Build system | Maven |
-| Architecture | Client-Server |
-| Communication | TCP / JSON |
-| Status | In Development |
+|:---|:---|
+| **Project** | SOC: CONTROL ROOM |
+| **Repository** | [liukseek/SOC-Control-Room](https://github.com/liukseek/SOC-Control-Room) |
+| **Language** | Java |
+| **Build system** | Maven |
+| **Architecture** | Client-Server |
+| **Communication** | TCP / JSON |
+| **License** | MIT |
+| **Status** | In Development |
+
+<br>
+
+<div align="center">
 
 ---
 
-**SOC: CONTROL ROOM**
+### SOC: CONTROL ROOM
 
 *Investigate. Analyze. Identify.*
+
+<sub>[Back to top](#soc-control-room)</sub>
+
+</div>
