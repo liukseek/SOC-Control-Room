@@ -4,9 +4,12 @@
  */
 package it.soc.server;
 
+import it.soc.common.Message;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ConnectionManager {
 
@@ -15,6 +18,9 @@ public class ConnectionManager {
 
     private final ConcurrentHashMap<String, String> playerNames =
             new ConcurrentHashMap<>();
+
+    private final CopyOnWriteArrayList<String> joinOrder =
+            new CopyOnWriteArrayList<>();
 
     // Registra un client e gli assegna un ID univoco
     public String register(ClientHandler handler) {
@@ -30,29 +36,15 @@ public class ConnectionManager {
     public void unregister(String clientId) {
         clients.remove(clientId);
         playerNames.remove(clientId);
+        joinOrder.remove(clientId);
     }
 
     // Registra il nome del giocatore
     public void setPlayerName(String clientId, String name) {
         if (clients.containsKey(clientId)) {
             playerNames.put(clientId, name);
+            joinOrder.addIfAbsent(clientId);
         }
-    }
-
-    public synchronized boolean tryRegisterName(String clientId, String name) {
-        if (!clients.containsKey(clientId)) {
-            return false;
-        }
-
-        for (var entry : playerNames.entrySet()) {
-            if (!entry.getKey().equals(clientId)
-                    && entry.getValue().equalsIgnoreCase(name)) {
-                return false;
-            }
-        }
-
-        playerNames.put(clientId, name);
-        return true;
     }
 
     // Restituisce il nome di un giocatore
@@ -62,7 +54,50 @@ public class ConnectionManager {
 
     // Restituisce la lista dei nomi dei giocatori
     public List<String> getPlayerNames() {
-        return List.copyOf(playerNames.values());
+        List<String> names = new ArrayList<>();
+
+        for (String clientId : joinOrder) {
+            String name = playerNames.get(clientId);
+
+            if (name != null) {
+                names.add(name);
+            }
+        }
+
+        return List.copyOf(names);
+    }
+
+    public List<String> getLobbyClientIds() {
+        List<String> ids = new ArrayList<>();
+
+        for (String clientId : joinOrder) {
+            if (playerNames.containsKey(clientId)) {
+                ids.add(clientId);
+            }
+        }
+
+        return List.copyOf(ids);
+    }
+
+    public String getHostId() {
+        List<String> ids = getLobbyClientIds();
+        return ids.isEmpty() ? null : ids.get(0);
+    }
+
+    public String getHostName() {
+        String hostId = getHostId();
+        return hostId == null ? null : playerNames.get(hostId);
+    }
+
+    public boolean isNameTaken(String name, String clientId) {
+        for (var entry : playerNames.entrySet()) {
+            if (!entry.getKey().equals(clientId)
+                    && entry.getValue().equalsIgnoreCase(name)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // Restituisce il numero di client connessi
@@ -74,16 +109,20 @@ public class ConnectionManager {
     public List<String> getClientIds() {
         return List.copyOf(clients.keySet());
     }
+
+    public void sendTo(String clientId, Message message) {
+        ClientHandler handler = clients.get(clientId);
+
+        if (handler != null) {
+            handler.sendMessage(message);
+        }
+    }
     
-    // Invia un messaggio a tutti i giocatori in lobby
+    // Invia un messaggio a tutti i client connessi
     public void broadcast(it.soc.common.Message message) {
 
-        for (String clientId : playerNames.keySet()) {
-            ClientHandler client = clients.get(clientId);
-
-            if (client != null) {
-                client.sendMessage(message);
-            }
+        for (ClientHandler client : clients.values()) {
+            client.sendMessage(message);
         }
     }
 

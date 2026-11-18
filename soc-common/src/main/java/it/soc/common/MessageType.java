@@ -14,5 +14,12 @@ public enum MessageType {
     SUBMIT_VOTE,
     ERROR,
     PING,
-    PONG
+    PONG,
+    START_GAME,
+    PLAYER_ACTION,
+    ACTION_RESULT,
+    EVIDENCE_RESULT,
+    SHARE_EVIDENCE,
+    CHAT,
+    GAME_EVENT
 }
