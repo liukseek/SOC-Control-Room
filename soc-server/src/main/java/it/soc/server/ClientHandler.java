@@ -60,7 +60,8 @@ public class ClientHandler implements Runnable {
                     case JOIN_LOBBY -> {
                         String name = message.content().trim();
 
-                        if (name.isBlank() || name.length() > 20) {
+                        if (name.isBlank() || name.length() > 20
+                                || name.contains(",")) {
                             sendMessage(new Message(
                                     MessageType.ERROR,
                                     "server",
@@ -69,7 +70,14 @@ public class ClientHandler implements Runnable {
                             break;
                         }
 
-                        connectionManager.setPlayerName(clientId, name);
+                        if (!connectionManager.tryRegisterName(clientId, name)) {
+                            sendMessage(new Message(
+                                    MessageType.ERROR,
+                                    "server",
+                                    "Nome già in uso."
+                            ));
+                            break;
+                        }
 
                         System.out.println(
                                 "Giocatore entrato nella lobby: " + name

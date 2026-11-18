@@ -39,6 +39,22 @@ public class ConnectionManager {
         }
     }
 
+    public synchronized boolean tryRegisterName(String clientId, String name) {
+        if (!clients.containsKey(clientId)) {
+            return false;
+        }
+
+        for (var entry : playerNames.entrySet()) {
+            if (!entry.getKey().equals(clientId)
+                    && entry.getValue().equalsIgnoreCase(name)) {
+                return false;
+            }
+        }
+
+        playerNames.put(clientId, name);
+        return true;
+    }
+
     // Restituisce il nome di un giocatore
     public String getPlayerName(String clientId) {
         return playerNames.get(clientId);
@@ -59,11 +75,15 @@ public class ConnectionManager {
         return List.copyOf(clients.keySet());
     }
     
-    // Invia un messaggio a tutti i client connessi
+    // Invia un messaggio a tutti i giocatori in lobby
     public void broadcast(it.soc.common.Message message) {
 
-        for (ClientHandler client : clients.values()) {
-            client.sendMessage(message);
+        for (String clientId : playerNames.keySet()) {
+            ClientHandler client = clients.get(clientId);
+
+            if (client != null) {
+                client.sendMessage(message);
+            }
         }
     }
 
