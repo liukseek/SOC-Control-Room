@@ -3,6 +3,8 @@ package it.soc.client;
 
 import it.soc.common.Message;
 import it.soc.common.MessageType;
+import it.soc.common.Protocol;
+import it.soc.common.model.LobbyState;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -30,8 +32,11 @@ public class ConnectionWindow extends JFrame {
     private JButton enterButton;
 
     private final NetworkClient networkClient = new NetworkClient();
+    private final ClientSession session = new ClientSession(networkClient);
 
     private boolean joinRequested = false;
+    private double animationPhase = 0;
+    private Timer connectingTimer;
 
     public ConnectionWindow() {
         setTitle("SOC: CONTROL ROOM");
@@ -42,19 +47,16 @@ public class ConnectionWindow extends JFrame {
 
         setContentPane(createBackground());
 
-        networkClient.setMessageListener(message ->
-                SwingUtilities.invokeLater(() -> handleServerMessage(message))
-        );
+        session.setHandler(this::handleServerMessage);
 
-        networkClient.setDisconnectListener(reason ->
-                SwingUtilities.invokeLater(() -> {
-                    statusLabel.setForeground(new Color(220, 145, 125));
-                    statusLabel.setText("Connessione persa.");
+        session.setDisconnectHandler(reason -> {
+            stopConnectingAnimation();
+            statusLabel.setForeground(new Color(220, 145, 125));
+            statusLabel.setText("Connessione persa.");
 
-                    enterButton.setEnabled(true);
-                    enterButton.setText("ENTRA");
-                })
-        );
+            enterButton.setEnabled(true);
+            enterButton.setText("ENTRA");
+        });
     }
 
     private JPanel createBackground() {
@@ -102,6 +104,12 @@ public class ConnectionWindow extends JFrame {
         };
 
         background.setBorder(new EmptyBorder(45, 75, 45, 75));
+
+        Timer animation = new Timer(40, e -> {
+            animationPhase += 0.04;
+            background.repaint();
+        });
+        animation.start();
 
         JPanel content = new JPanel(new GridBagLayout());
         content.setOpaque(false);
@@ -260,20 +268,39 @@ public class ConnectionWindow extends JFrame {
             p.draw(new Line2D.Double(a, b));
         }
 
-        for (Point2D point : points) {
-            p.setColor(new Color(173, 204, 220, 180));
+        for (int i = 0; i < points.size(); i++) {
+            Point2D point = points.get(i);
+            double pulse = (Math.sin(animationPhase * 1.6 + i * 0.9) + 1) / 2;
+
+            p.setColor(new Color(173, 204, 220, 120 + (int) (pulse * 110)));
             p.fill(new Ellipse2D.Double(
                     point.getX() - 3,
                     point.getY() - 3,
                     6, 6
             ));
 
-            p.setColor(new Color(150, 184, 204, 65));
+            double ring = 8 + pulse * 5;
+
+            p.setColor(new Color(150, 184, 204, 30 + (int) ((1 - pulse) * 60)));
             p.draw(new Ellipse2D.Double(
-                    point.getX() - 8,
-                    point.getY() - 8,
-                    16, 16
+                    point.getX() - ring,
+                    point.getY() - ring,
+                    ring * 2, ring * 2
             ));
+        }
+
+        for (int i = 0; i < links.length; i++) {
+            double t = (animationPhase * 0.35 + i * 0.37) % 1.0;
+            Point2D a = points.get(links[i][0]);
+            Point2D b = points.get(links[i][1]);
+
+            double x = a.getX() + (b.getX() - a.getX()) * t;
+            double y = a.getY() + (b.getY() - a.getY()) * t;
+
+            p.setColor(new Color(190, 220, 235, 70));
+            p.fill(new Ellipse2D.Double(x - 4.5, y - 4.5, 9, 9));
+            p.setColor(new Color(215, 235, 245, 220));
+            p.fill(new Ellipse2D.Double(x - 2, y - 2, 4, 4));
         }
 
         p.setStroke(new BasicStroke(1.3f));
@@ -303,6 +330,19 @@ public class ConnectionWindow extends JFrame {
         );
 
         g.draw(curve);
+
+        double t = (animationPhase * 0.18 + (x1 + y2) * 0.001) % 1.0;
+        double cx = curve.getCtrlX();
+        double cy = curve.getCtrlY();
+        double px = (1 - t) * (1 - t) * x1 + 2 * (1 - t) * t * cx + t * t * x2;
+        double py = (1 - t) * (1 - t) * y1 + 2 * (1 - t) * t * cy + t * t * y2;
+
+        Color previous = g.getColor();
+        g.setColor(new Color(170, 205, 225, 60));
+        g.fill(new Ellipse2D.Double(px - 6, py - 6, 12, 12));
+        g.setColor(new Color(205, 230, 242, 210));
+        g.fill(new Ellipse2D.Double(px - 2.5, py - 2.5, 5, 5));
+        g.setColor(previous);
     }
 
     private void drawBinary(Graphics2D g, int w, int h) {
@@ -426,6 +466,8 @@ public class ConnectionWindow extends JFrame {
         panel.add(statusLabel);
 
         enterButton.addActionListener(e -> connect());
+        nicknameField.addActionListener(e -> serverField.requestFocusInWindow());
+        serverField.addActionListener(e -> connect());
 
         return panel;
     }
@@ -526,9 +568,11 @@ public class ConnectionWindow extends JFrame {
         }
 
         joinRequested = false;
+        session.setNickname(nickname);
 
         enterButton.setEnabled(false);
-        enterButton.setText("CONNESSIONE...");
+        enterButton.setText("CONNESSIONE");
+        startConnectingAnimation();
 
         statusLabel.setForeground(STEEL);
         statusLabel.setText("Connessione al server in corso...");
@@ -537,7 +581,7 @@ public class ConnectionWindow extends JFrame {
 
             @Override
             protected Void doInBackground() throws Exception {
-                networkClient.connect(server, 1234);
+                networkClient.connect(server, Protocol.DEFAULT_PORT);
 
                 networkClient.sendMessage(new Message(
                         MessageType.CONNECT,
@@ -602,16 +646,17 @@ public class ConnectionWindow extends JFrame {
             }
 
             case LOBBY_UPDATE -> {
-                LobbyWindow lobbyWindow = new LobbyWindow(
-                networkClient,
-                nicknameField.getText().trim()
+                stopConnectingAnimation();
+
+                LobbyWindow lobbyWindow = new LobbyWindow(session);
+
+                lobbyWindow.updateLobby(
+                        Protocol.fromContent(message.content(), LobbyState.class)
                 );
 
-            lobbyWindow.updatePlayers(message.content());
+                lobbyWindow.setVisible(true);
 
-            lobbyWindow.setVisible(true);
-
-            dispose();
+                dispose();
             }
 
             case ERROR -> {
@@ -625,7 +670,28 @@ public class ConnectionWindow extends JFrame {
         }
     }
 
+    private void startConnectingAnimation() {
+        stopConnectingAnimation();
+
+        int[] dots = {0};
+
+        connectingTimer = new Timer(350, e -> {
+            dots[0] = (dots[0] + 1) % 4;
+            enterButton.setText("CONNESSIONE" + ".".repeat(dots[0]));
+        });
+
+        connectingTimer.start();
+    }
+
+    private void stopConnectingAnimation() {
+        if (connectingTimer != null) {
+            connectingTimer.stop();
+            connectingTimer = null;
+        }
+    }
+
     private void connectionError(String error) {
+        stopConnectingAnimation();
         statusLabel.setForeground(new Color(220, 145, 125));
         statusLabel.setText(error);
 

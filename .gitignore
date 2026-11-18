@@ -23,3 +23,6 @@ target/
 *.tmp
 *.swp
 
+
+# Maven scaricato da compila.bat
+.maven/

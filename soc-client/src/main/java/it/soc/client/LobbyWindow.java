@@ -3,6 +3,9 @@ package it.soc.client;
 
 import it.soc.common.Message;
 import it.soc.common.MessageType;
+import it.soc.common.Protocol;
+import it.soc.common.model.GameState;
+import it.soc.common.model.LobbyState;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -11,6 +14,8 @@ import java.awt.event.KeyEvent;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Line2D;
 import java.awt.geom.RoundRectangle2D;
+import java.util.HashMap;
+import java.util.Map;
 
 public class LobbyWindow extends JFrame {
 
@@ -39,20 +44,33 @@ public class LobbyWindow extends JFrame {
     private final JButton leaveButton =
             new JButton("ESCI DALLA SESSIONE");
 
-    private final NetworkClient networkClient;
+    private final JButton startButton =
+            new JButton("AVVIA SESSIONE");
+
+    private final JLabel waitingTitle = new JLabel("In attesa");
+    private final JLabel waitingDescription = new JLabel();
+    private final JLabel waitingIcon = new JLabel("◷");
+    private final Map<String, Long> joinedAt = new HashMap<>();
+
+    private final ClientSession session;
     private final String nickname;
+
+    private JList<String> playerList;
+    private boolean isHost;
+    private int minPlayers = 3;
 
     private AnimatedBackground animatedBackground;
     private Timer countAnimationTimer;
+    private String hostName;
 
-    public LobbyWindow(NetworkClient networkClient, String nickname) {
-        this.networkClient = networkClient;
-        this.nickname = nickname;
+    public LobbyWindow(ClientSession session) {
+        this.session = session;
+        this.nickname = session.nickname();
 
         setTitle("SOC: CONTROL ROOM - Sala operativa");
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-        setSize(1250, 780);
-        setMinimumSize(new Dimension(950, 650));
+        setSize(1250, 860);
+        setMinimumSize(new Dimension(950, 760));
         setLocationRelativeTo(null);
 
         animatedBackground = new AnimatedBackground();
@@ -76,15 +94,24 @@ public class LobbyWindow extends JFrame {
             }
         });
 
-        networkClient.setMessageListener(message ->
-                SwingUtilities.invokeLater(
-                        () -> handleServerMessage(message)
-                )
-        );
+        startButton.addActionListener(e -> {
+            startButton.setEnabled(false);
+            statusLabel.setForeground(STEEL);
+            statusLabel.setText("Avvio della sessione...");
+            session.send(MessageType.START_GAME, "");
+        });
 
-        networkClient.setDisconnectListener(reason ->
-                SwingUtilities.invokeLater(this::showDisconnected)
-        );
+        session.setHandler(this::handleServerMessage);
+        session.setDisconnectHandler(reason -> showDisconnected());
+
+        new Timer(40, e -> {
+            if (playerList != null && !joinedAt.isEmpty()) {
+                playerList.repaint();
+                joinedAt.values().removeIf(
+                        time -> System.currentTimeMillis() - time > 2000
+                );
+            }
+        }).start();
     }
 
     // --------------------------------------------------
@@ -239,7 +266,7 @@ public class LobbyWindow extends JFrame {
         heading.add(titlePanel, BorderLayout.WEST);
         heading.add(playerCountLabel, BorderLayout.EAST);
 
-        JList<String> playerList = new JList<>(playerModel);
+        playerList = new JList<>(playerModel);
         playerList.setOpaque(false);
         playerList.setSelectionMode(
                 ListSelectionModel.SINGLE_SELECTION
@@ -302,13 +329,13 @@ public class LobbyWindow extends JFrame {
 
         JPanel countCard = new JPanel();
         countCard.setBackground(PANEL_LIGHT);
-        countCard.setBorder(new EmptyBorder(17, 18, 17, 18));
+        countCard.setBorder(new EmptyBorder(12, 18, 12, 18));
         countCard.setLayout(new BoxLayout(
                 countCard, BoxLayout.Y_AXIS
         ));
         countCard.setAlignmentX(Component.LEFT_ALIGNMENT);
         countCard.setMaximumSize(new Dimension(
-                Integer.MAX_VALUE, 115
+                Integer.MAX_VALUE, 100
         ));
 
         JLabel countTitle = new JLabel("OPERATORI CONNESSI");
@@ -355,7 +382,6 @@ public class LobbyWindow extends JFrame {
                 Integer.MAX_VALUE, 90
         ));
 
-        JLabel waitingIcon = new JLabel("◷");
         waitingIcon.setFont(new Font("Arial", Font.PLAIN, 26));
         waitingIcon.setForeground(STEEL);
 
@@ -365,12 +391,11 @@ public class LobbyWindow extends JFrame {
                 waitingText, BoxLayout.Y_AXIS
         ));
 
-        JLabel waitingTitle = new JLabel("In attesa");
         waitingTitle.setFont(new Font("Arial", Font.BOLD, 13));
         waitingTitle.setForeground(TEXT);
 
-        JLabel waitingDescription = new JLabel(
-                "<html>L'amministratore avvierà<br>"
+        waitingDescription.setText(
+                "<html>L'host avvierà<br>"
                 + "la sessione quando sarà pronta.</html>"
         );
         waitingDescription.setFont(new Font("Arial", Font.PLAIN, 11));
@@ -386,20 +411,36 @@ public class LobbyWindow extends JFrame {
         panel.add(heading);
         panel.add(Box.createVerticalStrut(5));
         panel.add(headingDescription);
-        panel.add(Box.createVerticalStrut(25));
+        panel.add(Box.createVerticalStrut(18));
         panel.add(countCard);
-        panel.add(Box.createVerticalStrut(25));
+        panel.add(Box.createVerticalStrut(18));
         panel.add(stateTitle);
         panel.add(Box.createVerticalStrut(8));
         panel.add(statusLabel);
-        panel.add(Box.createVerticalStrut(22));
+        panel.add(Box.createVerticalStrut(14));
         panel.add(separator);
-        panel.add(Box.createVerticalStrut(22));
+        panel.add(Box.createVerticalStrut(14));
         panel.add(instructionsTitle);
         panel.add(Box.createVerticalStrut(13));
         panel.add(steps);
-        panel.add(Box.createVerticalStrut(20));
+        panel.add(Box.createVerticalStrut(14));
         panel.add(waitingCard);
+        panel.add(Box.createVerticalStrut(14));
+
+        styleButton(
+                startButton,
+                STEEL,
+                new Color(145, 169, 185),
+                new Color(20, 29, 36)
+        );
+
+        startButton.setFont(new Font("Arial", Font.BOLD, 13));
+        startButton.setAlignmentX(Component.LEFT_ALIGNMENT);
+        startButton.setMaximumSize(new Dimension(Integer.MAX_VALUE, 46));
+        startButton.setPreferredSize(new Dimension(240, 46));
+        startButton.setVisible(false);
+
+        panel.add(startButton);
 
         return panel;
     }
@@ -418,7 +459,7 @@ public class LobbyWindow extends JFrame {
                 "Attendi gli altri partecipanti"
         ));
 
-        steps.add(Box.createVerticalStrut(15));
+        steps.add(Box.createVerticalStrut(9));
 
         steps.add(createStep(
                 "02",
@@ -426,7 +467,7 @@ public class LobbyWindow extends JFrame {
                 "La partita verrà avviata"
         ));
 
-        steps.add(Box.createVerticalStrut(15));
+        steps.add(Box.createVerticalStrut(9));
 
         steps.add(createStep(
                 "03",
@@ -551,16 +592,22 @@ public class LobbyWindow extends JFrame {
     // PLAYER LIST
     // --------------------------------------------------
 
-    public void updatePlayers(String players) {
+    public void updateLobby(LobbyState lobby) {
+        java.util.List<String> previous = java.util.Collections.list(playerModel.elements());
+
         playerModel.clear();
 
-        if (players != null && !players.isBlank()) {
-            for (String player : players.split(", ")) {
-                if (!player.isBlank()) {
-                    playerModel.addElement(player.trim());
-                }
+        for (String player : lobby.players()) {
+            playerModel.addElement(player);
+
+            if (!previous.isEmpty() && !previous.contains(player)) {
+                joinedAt.put(player, System.currentTimeMillis());
             }
         }
+
+        hostName = lobby.host();
+        isHost = nickname.equalsIgnoreCase(lobby.host() == null ? "" : lobby.host());
+        minPlayers = lobby.minPlayers();
 
         int count = playerModel.size();
 
@@ -570,8 +617,39 @@ public class LobbyWindow extends JFrame {
 
         animatePlayerCount(count);
 
-        statusLabel.setForeground(STEEL);
-        statusLabel.setText("In attesa di giocatori");
+        boolean ready = count >= minPlayers;
+
+        statusLabel.setForeground(ready ? new Color(137, 181, 169) : STEEL);
+
+        if (lobby.gameInProgress()) {
+            statusLabel.setText("Partita in corso");
+        } else if (ready) {
+            statusLabel.setText("Pronti per iniziare");
+        } else {
+            statusLabel.setText("In attesa di giocatori (" + count + "/" + minPlayers + ")");
+        }
+
+        startButton.setVisible(isHost);
+        startButton.setEnabled(isHost && ready && !lobby.gameInProgress());
+        startButton.setText(ready ? "AVVIA SESSIONE" : "SERVONO " + minPlayers + " OPERATORI");
+
+        if (isHost) {
+            waitingIcon.setText("★");
+            waitingTitle.setText("Sei l'host");
+            waitingDescription.setText(
+                    "<html>Avvia la sessione quando<br>tutti gli operatori sono pronti.</html>"
+            );
+        } else {
+            waitingIcon.setText("◷");
+            waitingTitle.setText("In attesa");
+            waitingDescription.setText(
+                    "<html>" + (lobby.host() == null ? "L'host" : lobby.host())
+                    + " avvierà la sessione<br>quando sarà pronta.</html>"
+            );
+        }
+
+        revalidate();
+        repaint();
     }
 
     private void animatePlayerCount(int target) {
@@ -619,17 +697,46 @@ public class LobbyWindow extends JFrame {
     private void handleServerMessage(Message message) {
         switch (message.type()) {
 
-            case LOBBY_UPDATE ->
-                    updatePlayers(message.content());
+            case LOBBY_UPDATE -> {
+                try {
+                    updateLobby(Protocol.fromContent(
+                            message.content(), LobbyState.class
+                    ));
+                } catch (IllegalArgumentException e) {
+                    System.err.println("Lobby non valida: " + e.getMessage());
+                }
+            }
 
             case ERROR -> {
                 statusLabel.setForeground(ERROR);
                 statusLabel.setText(message.content());
+                startButton.setEnabled(isHost && playerModel.size() >= minPlayers);
+            }
+
+            case ROLE_ASSIGN -> {
+                statusLabel.setForeground(STEEL);
+                statusLabel.setText("Ruolo ricevuto...");
             }
 
             case GAME_START -> {
                 statusLabel.setForeground(STEEL);
                 statusLabel.setText("Avvio della sessione...");
+
+                if (session.role() == null) {
+                    return;
+                }
+
+                try {
+                    GameState state = Protocol.fromContent(
+                            message.content(), GameState.class
+                    );
+
+                    GameWindow gameWindow = new GameWindow(session, state);
+                    gameWindow.setVisible(true);
+                    dispose();
+                } catch (IllegalArgumentException e) {
+                    System.err.println("Stato non valido: " + e.getMessage());
+                }
             }
 
             default -> System.out.println(
@@ -645,6 +752,8 @@ public class LobbyWindow extends JFrame {
         connectionLabel.setText("SERVER DISCONNESSO");
         connectionLabel.setForeground(ERROR);
         connectionDot.setForeground(ERROR);
+
+        startButton.setEnabled(false);
     }
 
     // --------------------------------------------------
@@ -710,10 +819,14 @@ public class LobbyWindow extends JFrame {
                             : value.substring(0, 1).toUpperCase()
             );
 
+            boolean host = value.equalsIgnoreCase(
+                    hostName == null ? "" : hostName
+            );
+
             role.setText(
-                    currentPlayer
-                            ? "TU · OPERATORE CONNESSO"
-                            : "OPERATORE CONNESSO"
+                    (currentPlayer ? "TU · " : "")
+                    + (host ? "HOST · " : "")
+                    + "OPERATORE CONNESSO"
             );
 
             if (currentPlayer) {
@@ -724,11 +837,22 @@ public class LobbyWindow extends JFrame {
                 role.setForeground(MUTED);
             }
 
-            setBackground(
-                    isSelected
-                            ? new Color(51, 69, 82)
-                            : PANEL_LIGHT
-            );
+            Color background = isSelected
+                    ? new Color(51, 69, 82)
+                    : PANEL_LIGHT;
+
+            Long joined = joinedAt.get(value);
+
+            if (joined != null) {
+                double fade = Math.max(0, 1 - (System.currentTimeMillis() - joined) / 2000.0);
+                background = new Color(
+                        (int) (background.getRed() + (112 - background.getRed()) * fade * 0.35),
+                        (int) (background.getGreen() + (142 - background.getGreen()) * fade * 0.35),
+                        (int) (background.getBlue() + (162 - background.getBlue()) * fade * 0.35)
+                );
+            }
+
+            setBackground(background);
 
             setOpaque(true);
 
@@ -1038,8 +1162,10 @@ public class LobbyWindow extends JFrame {
 
         confirmButton.addActionListener(e -> {
             dialog.dispose();
-            networkClient.close();
+            session.setDisconnectHandler(null);
+            session.close();
             dispose();
+            new ConnectionWindow().setVisible(true);
         });
 
         buttons.add(cancelButton);
