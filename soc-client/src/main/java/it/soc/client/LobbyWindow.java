@@ -47,6 +47,9 @@ public class LobbyWindow extends JFrame {
     private final JButton startButton =
             new JButton("AVVIA SESSIONE");
 
+    private final JButton tutorialButton =
+            new JButton("COME SI GIOCA");
+
     private final JLabel waitingTitle = new JLabel("In attesa");
     private final JLabel waitingDescription = new JLabel();
     private final JLabel waitingIcon = new JLabel("◷");
@@ -92,7 +95,14 @@ public class LobbyWindow extends JFrame {
             public void windowClosing(java.awt.event.WindowEvent e) {
                 leaveLobby();
             }
+
+            @Override
+            public void windowOpened(java.awt.event.WindowEvent e) {
+                TutorialDialog.openOnce(LobbyWindow.this);
+            }
         });
+
+        tutorialButton.addActionListener(e -> TutorialDialog.open(this));
 
         startButton.addActionListener(e -> {
             startButton.setEnabled(false);
@@ -440,7 +450,21 @@ public class LobbyWindow extends JFrame {
         startButton.setPreferredSize(new Dimension(240, 46));
         startButton.setVisible(false);
 
+        styleButton(
+                tutorialButton,
+                new Color(55, 65, 73),
+                new Color(75, 87, 96),
+                TEXT
+        );
+
+        tutorialButton.setFont(new Font("Arial", Font.BOLD, 12));
+        tutorialButton.setAlignmentX(Component.LEFT_ALIGNMENT);
+        tutorialButton.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        tutorialButton.setPreferredSize(new Dimension(240, 40));
+
         panel.add(startButton);
+        panel.add(Box.createVerticalStrut(10));
+        panel.add(tutorialButton);
 
         return panel;
     }

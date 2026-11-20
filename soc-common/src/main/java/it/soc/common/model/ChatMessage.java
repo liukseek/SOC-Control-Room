@@ -4,5 +4,6 @@ public record ChatMessage(
         String from,
         String text,
         Evidence evidence,
-        String time
+        String time,
+        String to
 ) {}

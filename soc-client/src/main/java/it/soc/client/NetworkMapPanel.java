@@ -499,6 +499,7 @@ public class NetworkMapPanel extends JComponent {
             case ISOLATED -> "ISOLATO";
             case MAINTENANCE -> "MANUTENZIONE";
             case HONEYPOT -> "HONEYPOT";
+            case UNKNOWN -> "DISTURBATO";
             default -> node.alert() ? "ALLARME" : null;
         };
 
@@ -579,6 +580,7 @@ public class NetworkMapPanel extends JComponent {
             case ISOLATED -> new Color(170, 190, 205);
             case MAINTENANCE -> Theme.WARN;
             case HONEYPOT -> Theme.HONEY;
+            case UNKNOWN -> new Color(165, 140, 205);
             default -> node.alert() ? Theme.DANGER : Theme.STEEL;
         };
     }

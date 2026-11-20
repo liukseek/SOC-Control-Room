@@ -9,6 +9,8 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.RoundRectangle2D;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -25,8 +27,12 @@ public class FeedPanel extends UiKit.RoundedPanel {
     private final Function<String, String> systemName;
     private final Function<String, String> workstationOf;
     private final JLabel liveLabel = UiKit.label("● LIVE", 10, Font.BOLD, Theme.GOOD);
+    private final JCheckBox evidenceOnly = new JCheckBox("SOLO PROVE");
+    private final List<Entry> entries = new ArrayList<>();
 
     private Consumer<String> sendListener;
+
+    private record Entry(JComponent item, Component spacer, boolean evidence) {}
 
     public FeedPanel(String nickname, Color accent,
                      Function<String, String> systemName, Function<String, String> workstationOf) {
@@ -39,7 +45,19 @@ public class FeedPanel extends UiKit.RoundedPanel {
         setLayout(new BorderLayout(0, 10));
         setBorder(new EmptyBorder(18, 20, 16, 20));
 
-        add(UiKit.cardHeader("Canale operativo", "Chat del team, eventi e prove condivise", liveLabel),
+        evidenceOnly.setOpaque(false);
+        evidenceOnly.setFocusPainted(false);
+        evidenceOnly.setFont(Theme.font(10, Font.BOLD));
+        evidenceOnly.setForeground(Theme.MUTED);
+        evidenceOnly.setToolTipText("Mostra solo le prove condivise");
+        evidenceOnly.addActionListener(e -> applyFilter());
+
+        JPanel headerRight = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
+        headerRight.setOpaque(false);
+        headerRight.add(evidenceOnly);
+        headerRight.add(liveLabel);
+
+        add(UiKit.cardHeader("Canale operativo", "Chat del team, eventi e prove condivise", headerRight),
                 BorderLayout.NORTH);
 
         new Timer(800, e -> liveLabel.setForeground(
@@ -64,6 +82,7 @@ public class FeedPanel extends UiKit.RoundedPanel {
         input.setFont(Theme.font(13, Font.PLAIN));
         input.setForeground(Theme.TEXT);
         input.setCaretColor(Theme.TEXT);
+        input.setToolTipText("Per scrivere in privato: /w Nome messaggio");
         input.setBackground(new Color(35, 45, 53));
         input.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(75, 91, 103)),
@@ -103,28 +122,47 @@ public class FeedPanel extends UiKit.RoundedPanel {
     }
 
     public void addChat(ChatMessage message) {
-        append(new ChatItem(message));
+        append(new ChatItem(message), message.evidence() != null);
     }
 
     public void addEvent(GameEvent event) {
-        append(new EventItem(event.title(), event.description(), Theme.severity(event.severity())));
+        append(new EventItem(event.title(), event.description(), Theme.severity(event.severity())), false);
     }
 
     public void addNotice(String title, String description, Color color) {
-        append(new EventItem(title, description, color));
+        append(new EventItem(title, description, color), false);
     }
 
-    private void append(JComponent item) {
+    private void applyFilter() {
+        for (Entry entry : entries) {
+            boolean visible = !evidenceOnly.isSelected() || entry.evidence();
+
+            entry.item().setVisible(visible);
+            entry.spacer().setVisible(visible);
+        }
+
+        list.revalidate();
+        list.repaint();
+    }
+
+    private void append(JComponent item, boolean evidence) {
         JScrollBar bar = scroll.getVerticalScrollBar();
         boolean atBottom = bar.getValue() + bar.getVisibleAmount() >= bar.getMaximum() - 40;
 
-        item.setAlignmentX(Component.LEFT_ALIGNMENT);
-        list.add(item);
-        list.add(Box.createVerticalStrut(7));
+        Component spacer = Box.createVerticalStrut(7);
+        boolean visible = !evidenceOnly.isSelected() || evidence;
 
-        while (list.getComponentCount() > MAX_ITEMS * 2) {
-            list.remove(0);
-            list.remove(0);
+        item.setAlignmentX(Component.LEFT_ALIGNMENT);
+        item.setVisible(visible);
+        spacer.setVisible(visible);
+        list.add(item);
+        list.add(spacer);
+        entries.add(new Entry(item, spacer, evidence));
+
+        while (entries.size() > MAX_ITEMS) {
+            Entry old = entries.remove(0);
+            list.remove(old.item());
+            list.remove(old.spacer());
         }
 
         list.revalidate();
@@ -205,12 +243,26 @@ public class FeedPanel extends UiKit.RoundedPanel {
             head.setAlignmentX(Component.LEFT_ALIGNMENT);
 
             String ws = workstationOf.apply(message.from());
-            JLabel name = UiKit.label((own ? "Tu" : message.from()) + "  ", 12, Font.BOLD, color);
+            String who = own ? "Tu" : message.from();
+
+            if (message.to() != null) {
+                who = own ? "Tu → " + message.to() : message.from() + " → Te";
+            }
+
+            JLabel name = UiKit.label(who + "  ", 12, Font.BOLD, color);
             JLabel meta = new JLabel((ws == null ? "" : ws + "  ") + message.time());
             meta.setFont(Theme.mono(10, Font.PLAIN));
             meta.setForeground(Theme.MUTED);
 
             head.add(name);
+
+            if (message.to() != null) {
+                JLabel privateTag = EvidencePanel.pill("PRIVATO", Theme.WARN);
+                privateTag.setFont(Theme.font(9, Font.BOLD));
+                head.add(privateTag);
+                head.add(Box.createHorizontalStrut(6));
+            }
+
             head.add(meta);
 
             body.add(head);

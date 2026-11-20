@@ -44,7 +44,7 @@ Connected players enter a shared waiting room where they can see the other parti
 
 ### 3. Role Assignment
 
-The server secretly picks one **Insider** and assigns every player a fictional workstation (`WS-xx`). Each client receives only its own role through a private `ROLE_ASSIGN` message, revealed with an animated briefing.
+The server secretly picks one **Insider** and assigns every player a fictional workstation (`WS-xx`). With 5 or more players one of the analysts becomes the **Forensic analyst**, who extracts up to 6 log entries per analysis (instead of 4) and can recover traces the Insider has wiped. Each client receives only its own role through a private `ROLE_ASSIGN` message, revealed with an animated briefing.
 
 ### 4. Investigation
 
@@ -54,20 +54,30 @@ The corporate network is shown as an animated map with six systems (firewall, VP
 |---|---|---|---|
 | **Analyze** | Everyone | Extracts up to 4 log entries from the selected system and adds them to the player's private evidence board. | 6 s |
 | **Isolate** | Everyone | Isolates a system for 20 s: exfiltration attempts on it are blocked and leave a trace. | 35 s |
-| **Exfiltrate** | Insider | Steals +10% of the company data. Leaves a log trace that may reveal the workstation. | 18 s |
+| **Exfiltrate** | Insider | Steals data from the selected system (8% / 10% / 12% depending on the difficulty). Leaves a log trace that may reveal the workstation. | 18 s |
 | **Wipe** | Insider | Deletes the most recent trace from a system's log (a "manual log rotation" entry may remain). | 25 s |
 | **Frame** | Insider | Plants a fake exfiltration trace that points to another operator. | 35 s |
+| **Jam** | Insider | Disturbs a system for 15 s: analysts cannot analyze or isolate it, and exfiltrating from it leaves no trace. The jam itself leaves a log entry. | 30 s |
 
-Evidence is private: players must **share** it in the operational channel, where it appears as a *verified* card. The team chat is shared by everyone — including the Insider, who can lie.
+Repeating the same Insider move twice in a row exposes the Insider: its cooldown is 50% longer and its traces are easier to attribute.
 
-The Insider wins immediately if exfiltration reaches **100%**.
+Evidence is private: players must **share** it in the operational channel, where it appears as a *verified* card. The team chat is shared by everyone — including the Insider, who can lie. A private message to a single operator is sent with `/w Name message`, and the **SOLO PROVE** checkbox shows only the shared evidence.
+
+**Objectives** are listed under the map and give points at the end of the session. Analysts: analyze 3 different systems, share 2 pieces of evidence, block an exfiltration by isolating. Insider: wipe 2 traces, frame a colleague, jam a system.
+
+**Ways to win.** The Insider wins immediately if exfiltration reaches **100%**. The analysts win if they block enough exfiltration attempts (an exfiltration against an isolated system or a honeypot): 2, 3 or 4 blocks depending on the difficulty. The counter is shown under the title. Otherwise the final vote decides.
+
+### Early vote
+
+After 45 seconds of investigation any operator can ask to stop and vote. When half of the active operators have asked (2 of 3, 2 of 4, 3 of 5, ...) the investigation is suspended, the exfiltration stops and everybody has 40 seconds to vote. If the Insider is expelled the analysts win at once. If an innocent operator is expelled, that player is out of the session and the exfiltration rises by 10%. A tie or a majority of abstentions resumes the investigation with the time left. There are at most 2 early votes per session, 60 seconds apart.
 
 ### 5. Events
 
-Every 35–50 seconds the server triggers a random event:
+Every 35–50 seconds (20–30 seconds once exfiltration is above 60%) the server triggers a random event. Events react to the state of the game: the SIEM report is more likely once data is leaving, backups when traces were wiped, and the emergency audit only appears at 60% or more.
 
 | Event | Effect |
 |---|---|
+| Emergency audit | Reveals the system of the last exfiltration and resets the analysts' analysis cooldown (only at 60% or more). |
 | SIEM report | Reveals the system used for the last exfiltration. |
 | Backup restore | Restores wiped log entries on a system. |
 | Traffic spike | Floods every log with background noise. |
@@ -81,7 +91,13 @@ Players discuss in the channel and vote for the suspected Insider (or abstain). 
 
 ### 7. Results
 
-The player with the most votes is expelled. If the Insider is expelled, the analysts win; a tie, a majority of abstentions or the expulsion of an innocent operator gives the victory to the Insider. The results screen reveals the Insider, the vote tally, game statistics and the complete timeline of the Insider's actions.
+The player with the most votes is expelled. If the Insider is expelled, the analysts win; a tie, a majority of abstentions or the expulsion of an innocent operator gives the victory to the Insider. The results screen reveals the Insider, the vote tally, game statistics, the scoreboard and the complete timeline of the Insider's actions.
+
+Points: 100 to the winning side, 25 per completed objective, 25 to an analyst who voted for the Insider, and for the Insider half of the exfiltration percentage plus 20 for staying unexpelled. Victories, games and points are saved per nickname in `statistiche.properties` in the folder where the server runs, and shown in the results screen.
+
+### 8. Connection problems
+
+A player who loses the connection during a session has 45 seconds to reopen the client and log in again with the same nickname: the role and the state of the game are restored. The Insider who does not come back loses the session; an analyst who does not come back leaves it.
 
 ---
 
@@ -97,14 +113,21 @@ The player with the most votes is expelled. If the Insider is expelled, the anal
 - Dedicated Analyst and Insider interfaces (different accent colours, actions and visible information).
 - Animated network map with live traffic, alerts, isolation, maintenance and honeypot states.
 - Investigation mechanics, private evidence board and verified evidence sharing.
-- Insider actions: exfiltration, trace wiping and framing.
-- Simulated security events.
-- Operational channel (team chat, events, shared evidence) and toast notifications.
+- Insider actions: exfiltration, trace wiping, framing and jamming, with a penalty for repeating the same move.
+- Forensic analyst role (5 or more players).
+- Objectives with points, scoreboard and persistent statistics per nickname.
+- Analysts can win by blocking exfiltrations; early vote that suspends the investigation.
+- Three difficulty levels (easy, normal, hard).
+- Simulated security events that react to the state of the game.
+- Operational channel (team chat, private messages, events, shared evidence), "evidence only" filter and toast notifications.
 - Voting system with live progress.
-- Results screen with Insider reveal, vote tally, statistics and Insider timeline.
+- Results screen with Insider reveal, vote tally, statistics, scoreboard and Insider timeline.
+- Reconnection of a dropped player within 45 seconds.
+- Protection against floods (message rate limit) and oversized lines.
+- In-game tutorial, shown the first time and available from the lobby.
 - Return to the lobby for a new session.
-- Administrative control panel on the server (live session state, operators, log, configuration, start/stop).
-- Maven multi-module project structure and protocol unit tests.
+- Administrative control panel on the server (live session state, operators, log, configuration, difficulty, start/stop, server shutdown).
+- Maven multi-module project structure with protocol and game-rule unit tests.
 
 ---
 
@@ -189,7 +212,15 @@ Main classes:
 | `ConnectionManager` | Tracks connected clients, player names, join order and host. |
 | `GameConfig` | Session configuration (minimum players, phase durations). |
 | `ServerLog` | Server log shared by console and admin panel. |
-| `game.GameManager` | Game state machine, actions, events, voting and results. |
+| `game.GameManager` | Session lifecycle: lobby to roles, phases and ticker, results, scores and reconnection. |
+| `game.PlayerActions` | Analyze, isolate, exfiltrate, wipe, frame and jam, with cooldowns and blocks. |
+| `game.VotingBooth` | Final vote and early (emergency) vote. |
+| `game.EventDirector` | Random events that react to the state of the game. |
+| `game.TeamChannel` | Team chat, private messages and evidence sharing. |
+| `game.GameSession` / `GameMessenger` | Shared state of the running session and message building. |
+| `game.GameStats` | Persistent victories and points per nickname. |
+| `SocServer` | Accept loop and orderly shutdown. |
+| `BoundedLineReader` / `MessageRateLimiter` | Line size and message rate limits. |
 | `game.Scenario` | Network systems, role briefings and simulated log templates. |
 | `game.PlayerState` / `SystemState` / `LogEntry` | Server-side game state. |
 | `admin.AdminWindow` | Administrative control panel. |
@@ -253,7 +284,10 @@ SOC-Control-Room/
 │       ├── ConnectionManager.java
 │       ├── GameConfig.java
 │       ├── ServerLog.java
-│       ├── game/                 (GameManager, Scenario, state classes)
+│       ├── SocServer.java
+│       ├── BoundedLineReader.java
+│       ├── MessageRateLimiter.java
+│       ├── game/                 (GameManager, PlayerActions, VotingBooth, EventDirector, TeamChannel, ...)
 │       └── admin/                (AdminWindow)
 │
 └── soc-client/
@@ -333,6 +367,7 @@ Structured payloads (lobby state, game state, evidence, ...) are encoded with `P
 | `CHAT` | Both | Text from the client; `ChatMessage` (optionally with verified evidence) from the server |
 | `GAME_EVENT` | Server → Players | `GameEvent` (phase changes, simulated security events) |
 | `SUBMIT_VOTE` | Client → Server | Voted player name, or empty to abstain |
+| `CALL_VOTE` | Client → Server | Request to stop the investigation and vote (early vote) |
 | `GAME_OVER` | Server → Players | `GameResult` |
 | `ERROR` | Server → One | Error description |
 | `DISCONNECT` | Client → Server | Client disconnection |
@@ -474,6 +509,7 @@ Optional arguments:
 |---|---|
 | `--nogui` | Run without the admin panel (console only). |
 | `--min=N` | Minimum number of players (default 3). |
+| `--difficulty=D` | `easy`, `normal` (default) or `hard`. Sets the exfiltration step, the Insider cooldowns, the blocks needed by the analysts and the investigation time (270 / 240 / 210 s). Put it before `--investigation`. |
 | `--investigation=S` | Investigation duration in seconds (default 240). |
 | `--voting=S` | Voting duration in seconds (default 60). |
 
@@ -512,6 +548,7 @@ Make sure the server port is reachable through the local network and that firewa
 | Shared communication protocol | Completed |
 | JSON serialization and deserialization | Completed |
 | Protocol unit tests | Implemented |
+| Game rule tests (win paths, early vote, reconnection, chat) | Implemented (46 tests in total) |
 | TCP server | Completed |
 | Client connection handling | Completed |
 | Player registration | Completed |

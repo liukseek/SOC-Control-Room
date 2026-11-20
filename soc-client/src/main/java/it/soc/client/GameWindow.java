@@ -59,6 +59,8 @@ public class GameWindow extends JFrame {
     private final JLabel selectedDetails = UiKit.label("Clicca un nodo sulla mappa per scegliere il bersaglio delle azioni",
             11, Font.PLAIN, Theme.MUTED);
     private final JPanel rosterChips = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+    private final JButton callVoteButton = new JButton("VOTO ANTICIPATO");
+    private final JTextArea objectivesText = ScrollableList.wrap("", 10, Font.BOLD, Theme.MUTED);
     private final CardLayout centerCards = new CardLayout();
     private final JPanel centerPanel = new JPanel(centerCards);
 
@@ -77,7 +79,9 @@ public class GameWindow extends JFrame {
         this.accent = Theme.accent(role);
         this.nickname = session.nickname();
 
-        setTitle("SOC: CONTROL ROOM - " + (role == Role.INSIDER ? "Insider" : "SOC Analyst") + " - " + nickname);
+        setTitle("SOC: CONTROL ROOM - "
+                + (role == Role.INSIDER ? "Insider" : role == Role.FORENSIC ? "Forense" : "SOC Analyst")
+                + " - " + nickname);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setSize(1440, 880);
         setMinimumSize(new Dimension(1200, 760));
@@ -137,7 +141,8 @@ public class GameWindow extends JFrame {
 
         applyState(initial);
         feedPanel.addNotice("Sessione avviata",
-                "Sei collegato come " + nickname + " dalla postazione " + roleInfo.workstation() + ".",
+                "Sei collegato come " + nickname + " dalla postazione " + roleInfo.workstation()
+                        + ". Per scrivere in privato usa /w Nome messaggio.",
                 accent);
     }
 
@@ -269,6 +274,7 @@ public class GameWindow extends JFrame {
         legend.add(legendItem("ALLARME", Theme.DANGER));
         legend.add(legendItem("ISOLATO", new Color(170, 190, 205)));
         legend.add(legendItem("MANUTENZIONE", Theme.WARN));
+        legend.add(legendItem("DISTURBATO", new Color(165, 140, 205)));
 
         if (role != Role.INSIDER) {
             legend.add(legendItem("HONEYPOT", Theme.HONEY));
@@ -310,6 +316,13 @@ public class GameWindow extends JFrame {
         selectionText.add(nameRow);
         selection.add(selectionText, BorderLayout.CENTER);
 
+        UiKit.styleButton(callVoteButton, new Color(80, 66, 42), new Color(110, 90, 55), Theme.WARN);
+        callVoteButton.setPreferredSize(new Dimension(190, 34));
+        callVoteButton.setEnabled(false);
+        callVoteButton.setToolTipText("Chiedi di interrompere l'indagine e votare subito: serve la richiesta di metà "
+                + "degli operatori, dopo 45 secondi di indagine, al massimo 2 volte per partita.");
+        selection.add(callVoteButton, BorderLayout.EAST);
+
         JPanel actions = new JPanel(new GridLayout(1, 0, 10, 0));
         actions.setOpaque(false);
         actions.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -320,9 +333,10 @@ public class GameWindow extends JFrame {
         addButton(actions, ActionType.ISOLATE, "ISOLA", "Blocca per 20 s", new Color(150, 175, 192));
 
         if (role == Role.INSIDER) {
-            addButton(actions, ActionType.EXFILTRATE, "ESFILTRA", "+10% dati rubati", Theme.DANGER);
+            addButton(actions, ActionType.EXFILTRATE, "ESFILTRA", "Porta fuori dati", Theme.DANGER);
             addButton(actions, ActionType.WIPE, "CANCELLA", "Rimuovi una traccia", new Color(226, 140, 104));
             addButton(actions, ActionType.FRAME, "DEPISTA", "Incolpa un collega", new Color(214, 118, 150));
+            addButton(actions, ActionType.JAM, "DISTURBA", "Oscura per 15 s", new Color(165, 140, 205));
         }
 
         JPanel roster = new JPanel(new BorderLayout(10, 0));
@@ -334,11 +348,23 @@ public class GameWindow extends JFrame {
         roster.add(UiKit.label("OPERATORI", 10, Font.BOLD, Theme.MUTED), BorderLayout.WEST);
         roster.add(rosterChips, BorderLayout.CENTER);
 
+        JPanel objectives = new JPanel(new BorderLayout(10, 0));
+        objectives.setOpaque(false);
+        objectives.setAlignmentX(Component.LEFT_ALIGNMENT);
+        objectives.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
+
+        JLabel objectivesTitle = UiKit.label("OBIETTIVI", 10, Font.BOLD, Theme.MUTED);
+        objectivesTitle.setVerticalAlignment(SwingConstants.TOP);
+        objectives.add(objectivesTitle, BorderLayout.WEST);
+        objectives.add(objectivesText, BorderLayout.CENTER);
+
         bottom.add(selection);
         bottom.add(Box.createVerticalStrut(10));
         bottom.add(actions);
         bottom.add(Box.createVerticalStrut(14));
         bottom.add(roster);
+        bottom.add(Box.createVerticalStrut(8));
+        bottom.add(objectives);
 
         view.add(header, BorderLayout.NORTH);
         view.add(mapHolder, BorderLayout.CENTER);
@@ -385,6 +411,11 @@ public class GameWindow extends JFrame {
         feedPanel.setSendListener(text -> session.send(MessageType.CHAT, text));
 
         votePanel.setVoteListener(vote -> session.send(MessageType.SUBMIT_VOTE, vote));
+
+        callVoteButton.addActionListener(e -> {
+            callVoteButton.setEnabled(false);
+            session.send(MessageType.CALL_VOTE, "");
+        });
     }
 
     private void performAction(ActionType action, ActionButton source) {
@@ -421,7 +452,7 @@ public class GameWindow extends JFrame {
 
         if (state != null) {
             for (PlayerInfo player : state.players()) {
-                if (player.name().equals(nickname) || !player.connected()) {
+                if (player.name().equals(nickname) || !player.connected() || player.expelled()) {
                     continue;
                 }
 
@@ -469,12 +500,27 @@ public class GameWindow extends JFrame {
             case ISOLATED -> "ISOLATO";
             case MAINTENANCE -> "IN MANUTENZIONE";
             case HONEYPOT -> "HONEYPOT ATTIVO";
+            case UNKNOWN -> "SEGNALE DISTURBATO";
             default -> node.alert() ? "ALLARME SIEM" : "ONLINE";
         };
     }
 
+    private boolean expelled() {
+        if (state == null) {
+            return false;
+        }
+
+        for (PlayerInfo player : state.players()) {
+            if (player.name().equals(nickname)) {
+                return player.expelled();
+            }
+        }
+
+        return false;
+    }
+
     private void refreshButtons() {
-        boolean active = state != null && state.phase() == Phase.INVESTIGATION && !finished;
+        boolean active = state != null && state.phase() == Phase.INVESTIGATION && !finished && !expelled();
         boolean hasTarget = map.selected() != null;
 
         for (ActionButton button : buttons.values()) {
@@ -545,30 +591,52 @@ public class GameWindow extends JFrame {
             briefing.setCountdown(next.secondsLeft(), next.phaseDuration());
         }
 
+        votePanel.update(next.players());
+
         if (next.phase() != lastPhase) {
-            onPhaseChange(next.phase());
+            onPhaseChange(next);
             lastPhase = next.phase();
         }
 
         updateRoster(next.players());
-        votePanel.update(next.players());
         refreshSelection();
+        updateObjectives(next);
+        updateCallVote(next);
 
-        long connected = next.players().stream().filter(PlayerInfo::connected).count();
-        subtitleLabel.setText(phaseSubtitle(next.phase()) + "  ·  " + connected + " operatori connessi");
+        long connected = next.players().stream().filter(p -> p.connected() && !p.expelled()).count();
+        subtitleLabel.setText(phaseSubtitle(next.phase(), next.emergency()) + "  ·  " + connected
+                + " operatori attivi  ·  esfiltrazioni bloccate " + next.blocked() + "/" + next.blockLimit());
     }
 
-    private String phaseSubtitle(Phase phase) {
+    private void updateObjectives(GameState next) {
+        String text = next.objectives() == null ? "" : String.join("     ", next.objectives());
+
+        if (!text.equals(objectivesText.getText())) {
+            objectivesText.setText(text);
+        }
+    }
+
+    private void updateCallVote(GameState next) {
+        boolean voting = next.phase() == Phase.INVESTIGATION;
+
+        callVoteButton.setVisible(next.phase() != Phase.BRIEFING);
+        callVoteButton.setText(next.callVotes() > 0 && voting
+                ? "VOTO ANTICIPATO " + next.callVotes() + "/" + next.callVotesNeeded()
+                : "VOTO ANTICIPATO");
+        callVoteButton.setEnabled(next.canCallVote() && !finished);
+    }
+
+    private String phaseSubtitle(Phase phase, boolean emergency) {
         return switch (phase) {
             case BRIEFING -> "Lettura del briefing";
             case INVESTIGATION -> role == Role.INSIDER ? "Esfiltra i dati senza farti notare" : "Analizza i log e trova l'insider";
-            case VOTING -> "Discuti con il team e vota";
+            case VOTING -> emergency ? "Votazione di emergenza: l'indagine è sospesa" : "Discuti con il team e vota";
             default -> "Sessione conclusa";
         };
     }
 
-    private void onPhaseChange(Phase phase) {
-        switch (phase) {
+    private void onPhaseChange(GameState next) {
+        switch (next.phase()) {
             case BRIEFING -> titleLabel.setText("Briefing");
             case INVESTIGATION -> {
                 titleLabel.setText("Indagine in corso");
@@ -579,7 +647,9 @@ public class GameWindow extends JFrame {
 
                 centerCards.show(centerPanel, "MAP");
 
-                if (lastPhase != null) {
+                if (lastPhase == Phase.VOTING) {
+                    banner.show("INDAGINE RIPRESA", "Il tempo riparte da dove si era fermato.", accent);
+                } else if (lastPhase != null) {
                     banner.show("INDAGINE AVVIATA",
                             role == Role.INSIDER ? "Porta fuori i dati. Nessuno deve sospettare di te."
                                     : "Trova l'insider prima che porti fuori i dati.",
@@ -591,10 +661,18 @@ public class GameWindow extends JFrame {
                 }
             }
             case VOTING -> {
-                titleLabel.setText("Votazione");
+                votePanel.reset(next.emergency());
+                titleLabel.setText(next.emergency() ? "Votazione di emergenza" : "Votazione");
                 centerCards.show(centerPanel, "VOTE");
-                banner.show("FASE DI VOTO", "Chi è l'insider? Decidete insieme.", Theme.WARN);
-                toasts.show("Votazione aperta", "Scegli un operatore e conferma il voto.", Theme.WARN);
+
+                if (next.emergency()) {
+                    banner.show("VOTO DI EMERGENZA", "Indagine sospesa: decidete chi espellere.", Theme.DANGER);
+                    toasts.show("Votazione di emergenza", "Se espellete un innocente l'esfiltrazione sale del 10%.",
+                            Theme.DANGER);
+                } else {
+                    banner.show("FASE DI VOTO", "Chi è l'insider? Decidete insieme.", Theme.WARN);
+                    toasts.show("Votazione aperta", "Scegli un operatore e conferma il voto.", Theme.WARN);
+                }
             }
             default -> {
             }
@@ -605,7 +683,8 @@ public class GameWindow extends JFrame {
         StringBuilder key = new StringBuilder();
 
         for (PlayerInfo player : players) {
-            key.append(player.name()).append(player.connected()).append(player.voted()).append(';');
+            key.append(player.name()).append(player.connected()).append(player.voted())
+                    .append(player.expelled()).append(';');
         }
 
         if (key.toString().equals(rosterKey)) {
@@ -616,7 +695,8 @@ public class GameWindow extends JFrame {
         rosterChips.removeAll();
 
         for (PlayerInfo player : players) {
-            Color color = player.connected() ? Theme.playerColor(player.name()) : Theme.alpha(Theme.MUTED, 120);
+            Color color = player.connected() && !player.expelled()
+                    ? Theme.playerColor(player.name()) : Theme.alpha(Theme.MUTED, 120);
             String text = player.name() + (player.name().equals(nickname) ? " (tu)" : "")
                     + "  " + player.workstation()
                     + (state != null && state.phase() == Phase.VOTING && player.voted() ? "  ✓" : "");
@@ -624,7 +704,9 @@ public class GameWindow extends JFrame {
             JLabel chip = EvidencePanel.pill(text, color);
             chip.setFont(Theme.font(10, Font.BOLD));
 
-            if (!player.connected()) {
+            if (player.expelled()) {
+                chip.setText(player.name() + "  ESPULSO");
+            } else if (!player.connected()) {
                 chip.setText(player.name() + "  OFFLINE");
             }
 
@@ -703,6 +785,7 @@ public class GameWindow extends JFrame {
         evidencePanel.setShareEnabled(false);
         map.setInteractive(false);
         refreshButtons();
+        callVoteButton.setEnabled(false);
         backdrop.setAlarm(0);
 
         if (briefing != null) {
@@ -744,7 +827,8 @@ public class GameWindow extends JFrame {
         feedPanel.setInputEnabled(false);
 
         Dialogs.confirm(this, "Connessione persa",
-                "Il server non è più raggiungibile.<br>La partita non può continuare.", null, "ESCI");
+                "Il server non è più raggiungibile.<br>Riapri il gioco e rientra con lo stesso nickname<br>"
+                        + "entro 45 secondi per tornare nella partita.", null, "ESCI");
 
         System.exit(0);
     }

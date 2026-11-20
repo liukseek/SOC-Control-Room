@@ -5,6 +5,7 @@ import it.soc.common.model.Role;
 import it.soc.server.ConnectionManager;
 import it.soc.server.GameConfig;
 import it.soc.server.ServerLog;
+import it.soc.server.ServerMain;
 import it.soc.server.game.AdminSnapshot;
 import it.soc.server.game.GameManager;
 
@@ -49,6 +50,8 @@ public class AdminWindow extends JFrame {
     private final JCheckBox showRoles = new JCheckBox("Mostra ruoli");
     private final JButton startButton = new JButton("AVVIA PARTITA");
     private final JButton stopButton = new JButton("TERMINA PARTITA");
+    private final JButton shutdownButton = new JButton("ARRESTA SERVER");
+    private final JComboBox<GameConfig.Difficulty> difficultyBox = new JComboBox<>(GameConfig.Difficulty.values());
 
     private String lastPlayersKey = "";
 
@@ -199,10 +202,18 @@ public class AdminWindow extends JFrame {
 
         GameConfig config = gameManager.config();
 
+        JSpinner[] investigationSpinner = new JSpinner[1];
+
         card.add(configRow("Giocatori minimi", config.minPlayers(), 2, 12, 1, config::setMinPlayers));
         card.add(Box.createVerticalStrut(8));
-        card.add(configRow("Indagine (s)", config.investigationSeconds(), 30, 900, 30,
-                config::setInvestigationSeconds));
+        card.add(difficultyRow(config, investigationSpinner));
+        card.add(Box.createVerticalStrut(8));
+
+        JPanel investigationRow = configRow("Indagine (s)", config.investigationSeconds(), 30, 900, 30,
+                config::setInvestigationSeconds);
+        investigationSpinner[0] = (JSpinner) investigationRow.getComponent(1);
+
+        card.add(investigationRow);
         card.add(Box.createVerticalStrut(8));
         card.add(configRow("Voto (s)", config.votingSeconds(), 15, 300, 15, config::setVotingSeconds));
 
@@ -222,11 +233,62 @@ public class AdminWindow extends JFrame {
 
         stopButton.addActionListener(e -> gameManager.stopGame());
 
+        styleButton(shutdownButton, new Color(70, 52, 52), new Color(105, 62, 58), Color.WHITE);
+
+        shutdownButton.addActionListener(e -> {
+            int answer = JOptionPane.showConfirmDialog(this,
+                    "Tutti i giocatori verranno disconnessi e il server si fermerà.\nContinuare?",
+                    "Arresta server", JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
+
+            if (answer == JOptionPane.OK_OPTION) {
+                ServerMain.shutdown();
+                dispose();
+                System.exit(0);
+            }
+        });
+
         card.add(startButton);
         card.add(Box.createVerticalStrut(10));
         card.add(stopButton);
+        card.add(Box.createVerticalStrut(10));
+        card.add(shutdownButton);
 
         return card;
+    }
+
+    private JPanel difficultyRow(GameConfig config, JSpinner[] investigationSpinner) {
+        JPanel row = new JPanel(new BorderLayout());
+        row.setOpaque(false);
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
+
+        difficultyBox.setSelectedItem(config.difficulty());
+        difficultyBox.setPreferredSize(new Dimension(110, 30));
+        difficultyBox.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+                                                          boolean selected, boolean focus) {
+                return super.getListCellRendererComponent(list,
+                        value instanceof GameConfig.Difficulty d ? d.label() : value, index, selected, focus);
+            }
+        });
+
+        difficultyBox.addActionListener(e -> {
+            GameConfig.Difficulty chosen = (GameConfig.Difficulty) difficultyBox.getSelectedItem();
+
+            if (chosen != null) {
+                config.setDifficulty(chosen);
+
+                if (investigationSpinner[0] != null) {
+                    investigationSpinner[0].setValue(config.investigationSeconds());
+                }
+            }
+        });
+
+        row.add(label("Difficoltà", 12, Font.PLAIN, TEXT), BorderLayout.WEST);
+        row.add(difficultyBox, BorderLayout.EAST);
+
+        return row;
     }
 
     private JPanel configRow(String text, int value, int min, int max, int step,
@@ -414,7 +476,7 @@ public class AdminWindow extends JFrame {
         } else {
             for (AdminSnapshot.Player p : snapshot.players()) {
                 String role = showRoles.isSelected()
-                        ? (p.role() == Role.INSIDER ? "INSIDER" : "ANALISTA")
+                        ? (p.role() == Role.INSIDER ? "INSIDER" : p.role() == Role.FORENSIC ? "FORENSE" : "ANALISTA")
                         : "RUOLO NASCOSTO";
 
                 String details = p.workstation() + " · " + role + " · " + p.actions() + " azioni · "

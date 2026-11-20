@@ -13,12 +13,18 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 
-public class ClientHandler implements Runnable {
+public class ClientHandler implements Runnable, MessageSink {
+
+    private static final int MAX_LINE_LENGTH = 16 * 1024;
+    private static final int RATE_LIMIT = 40;
+    private static final long RATE_WINDOW_MILLIS = 1000;
+    private static final int MAX_STRIKES = 20;
 
     private final Socket socket;
     private final ConnectionManager connectionManager;
     private final GameManager gameManager;
     private final String clientId;
+    private final MessageRateLimiter limiter = new MessageRateLimiter(RATE_LIMIT, RATE_WINDOW_MILLIS);
 
     private volatile PrintWriter output;
 
@@ -36,7 +42,7 @@ public class ClientHandler implements Runnable {
     public void run() {
 
         try (
-            BufferedReader input = new BufferedReader(
+            BufferedReader reader = new BufferedReader(
                     new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8)
             );
             PrintWriter writer = new PrintWriter(
@@ -45,9 +51,24 @@ public class ClientHandler implements Runnable {
         ) {
             output = writer;
 
+            BoundedLineReader input = new BoundedLineReader(reader, MAX_LINE_LENGTH);
             String received;
 
             while ((received = input.readLine()) != null) {
+
+                if (!limiter.allow(System.currentTimeMillis())) {
+                    if (limiter.strikes() >= MAX_STRIKES) {
+                        sendMessage(new Message(
+                                MessageType.ERROR,
+                                "server",
+                                "Troppi messaggi: connessione chiusa."
+                        ));
+                        ServerLog.warn("Client " + clientId + " scollegato per eccesso di messaggi.");
+                        return;
+                    }
+
+                    continue;
+                }
 
                 Message message;
 
@@ -94,13 +115,7 @@ public class ClientHandler implements Runnable {
             ServerLog.info("Client disconnesso: "
                     + (name == null ? clientId : name));
 
-            try {
-                socket.close();
-            } catch (IOException e) {
-                ServerLog.error(
-                        "Errore chiusura socket: " + e.getMessage()
-                );
-            }
+            close();
         }
     }
 
@@ -121,46 +136,7 @@ public class ClientHandler implements Runnable {
                     "pong"
             ));
 
-            case JOIN_LOBBY -> {
-                String name = content.trim();
-
-                if (name.isBlank() || name.length() > 20) {
-                    sendMessage(new Message(
-                            MessageType.ERROR,
-                            "server",
-                            "Nome non valido."
-                    ));
-                    break;
-                }
-
-                if (connectionManager.isNameTaken(name, clientId)) {
-                    sendMessage(new Message(
-                            MessageType.ERROR,
-                            "server",
-                            "Nickname già in uso."
-                    ));
-                    break;
-                }
-
-                String current = connectionManager.getPlayerName(clientId);
-
-                if (gameManager.isInGame() && current == null) {
-                    sendMessage(new Message(
-                            MessageType.ERROR,
-                            "server",
-                            "Partita in corso, riprova tra qualche minuto."
-                    ));
-                    break;
-                }
-
-                connectionManager.setPlayerName(clientId, name);
-
-                ServerLog.info(
-                        "Giocatore entrato nella lobby: " + name
-                );
-
-                gameManager.broadcastLobby();
-            }
+            case JOIN_LOBBY -> joinLobby(content.trim());
 
             case START_GAME -> {
                 String error = gameManager.startGame(clientId);
@@ -182,6 +158,8 @@ public class ClientHandler implements Runnable {
 
             case SUBMIT_VOTE -> gameManager.handleVote(clientId, content);
 
+            case CALL_VOTE -> gameManager.handleCallVote(clientId);
+
             case DISCONNECT -> {
                 return false;
             }
@@ -194,9 +172,54 @@ public class ClientHandler implements Runnable {
         return true;
     }
 
+    private void joinLobby(String name) {
+        if (name.isBlank() || name.length() > 20) {
+            sendMessage(new Message(
+                    MessageType.ERROR,
+                    "server",
+                    "Nome non valido."
+            ));
+            return;
+        }
+
+        if (connectionManager.isNameTaken(name, clientId)) {
+            sendMessage(new Message(
+                    MessageType.ERROR,
+                    "server",
+                    "Nickname già in uso."
+            ));
+            return;
+        }
+
+        String current = connectionManager.getPlayerName(clientId);
+
+        if (gameManager.isInGame() && current == null) {
+            if (gameManager.canRejoin(name)) {
+                connectionManager.setPlayerName(clientId, name);
+                gameManager.rejoin(clientId, name);
+                return;
+            }
+
+            sendMessage(new Message(
+                    MessageType.ERROR,
+                    "server",
+                    "Partita in corso, riprova tra qualche minuto."
+            ));
+            return;
+        }
+
+        connectionManager.setPlayerName(clientId, name);
+
+        ServerLog.info(
+                "Giocatore entrato nella lobby: " + name
+        );
+
+        gameManager.broadcastLobby();
+    }
+
     private static boolean isLogged(MessageType type) {
         return switch (type) {
-            case PING, CHAT, PLAYER_ACTION, REQUEST_EVIDENCE, SHARE_EVIDENCE, SUBMIT_VOTE -> false;
+            case PING, CHAT, PLAYER_ACTION, REQUEST_EVIDENCE, SHARE_EVIDENCE, SUBMIT_VOTE, CALL_VOTE -> false;
             default -> true;
         };
     }
@@ -206,13 +229,24 @@ public class ClientHandler implements Runnable {
         return name == null ? "" : " da " + name;
     }
 
-    // Invia un messaggio a questo client
+    @Override
     public synchronized void sendMessage(Message message) {
 
         PrintWriter writer = output;
 
         if (writer != null) {
             writer.println(Protocol.encode(message));
+        }
+    }
+
+    @Override
+    public void close() {
+        try {
+            socket.close();
+        } catch (IOException e) {
+            ServerLog.error(
+                    "Errore chiusura socket: " + e.getMessage()
+            );
         }
     }
 }

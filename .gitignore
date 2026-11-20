@@ -26,3 +26,5 @@ target/
 
 # Maven scaricato da compila.bat
 .maven/
+statistiche.properties
+dist/
