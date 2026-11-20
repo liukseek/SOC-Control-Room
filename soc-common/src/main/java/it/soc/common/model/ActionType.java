@@ -5,5 +5,6 @@ public enum ActionType {
     ISOLATE,
     EXFILTRATE,
     WIPE,
-    FRAME
+    FRAME,
+    JAM
 }

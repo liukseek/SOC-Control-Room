@@ -17,6 +17,7 @@ public class SystemState {
     private int maintenanceFor;
     private int honeypotFor;
     private int alertFor;
+    private int jamFor;
 
     public SystemState(String id, String name, String description) {
         this.id = id;
@@ -81,6 +82,10 @@ public class SystemState {
         if (alertFor > 0) {
             alertFor--;
         }
+
+        if (jamFor > 0) {
+            jamFor--;
+        }
     }
 
     public boolean isIsolated() {
@@ -118,5 +123,13 @@ public class SystemState {
 
     public void raiseAlert(int seconds) {
         alertFor = Math.max(alertFor, seconds);
+    }
+
+    public boolean isJammed() {
+        return jamFor > 0;
+    }
+
+    public void setJam(int seconds) {
+        jamFor = seconds;
     }
 }

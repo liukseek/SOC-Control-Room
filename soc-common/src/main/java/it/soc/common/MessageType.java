@@ -12,6 +12,7 @@ public enum MessageType {
     GAME_OVER,
     REQUEST_EVIDENCE,
     SUBMIT_VOTE,
+    CALL_VOTE,
     ERROR,
     PING,
     PONG,

@@ -37,7 +37,25 @@ public final class Scenario {
                             "Esfiltra dati dai sistemi fino al 100%",
                             "Cancella le tue tracce dai log",
                             "Depista le indagini incolpando altri operatori",
+                            "Disturba un sistema per esfiltrare senza lasciare tracce",
                             "Sopravvivi al voto finale"
+                    )
+            );
+        }
+
+        if (role == Role.FORENSIC) {
+            return new RoleInfo(
+                    role,
+                    workstation,
+                    "FORENSE",
+                    "Sei l'analista forense del SOC. Le tue analisi estraggono più voci "
+                    + "di log e possono recuperare dal disco le tracce che l'insider "
+                    + "ha cancellato. Condividi quello che trovi con il team.",
+                    List.of(
+                            "Analizza i log: estrai più voci degli altri analisti",
+                            "Recupera le tracce cancellate dall'insider",
+                            "Condividi le prove verificate con il team",
+                            "Vota per identificare l'insider"
                     )
             );
         }

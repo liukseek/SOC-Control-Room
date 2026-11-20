@@ -30,6 +30,7 @@ public class VotePanel extends JPanel {
     private String selected;
     private String submitted;
     private String rosterKey = "";
+    private boolean meExpelled;
 
     public VotePanel(String nickname, Color accent) {
         this.nickname = nickname;
@@ -122,6 +123,22 @@ public class VotePanel extends JPanel {
         this.voteListener = listener;
     }
 
+    public void reset(boolean emergency) {
+        selected = null;
+        submitted = null;
+        confirmButton.setEnabled(false);
+        skipButton.setEnabled(!meExpelled);
+
+        statusLabel.setForeground(emergency ? Theme.WARN : Theme.MUTED);
+        statusLabel.setText(emergency
+                ? "Voto di emergenza: espellere un innocente fa salire l'esfiltrazione del 10%."
+                : "Seleziona l'operatore che ritieni sia l'insider.");
+
+        for (VoteCard card : cards.values()) {
+            card.repaint();
+        }
+    }
+
     private void submit(String vote) {
         if (voteListener == null) {
             return;
@@ -144,7 +161,7 @@ public class VotePanel extends JPanel {
         StringBuilder key = new StringBuilder();
 
         for (PlayerInfo player : players) {
-            key.append(player.name()).append(player.connected()).append(';');
+            key.append(player.name()).append(player.connected()).append(player.expelled()).append(';');
         }
 
         if (!key.toString().equals(rosterKey)) {
@@ -172,7 +189,11 @@ public class VotePanel extends JPanel {
                 card.player = player;
             }
 
-            if (player.connected()) {
+            if (player.name().equals(nickname)) {
+                meExpelled = player.expelled();
+            }
+
+            if (player.connected() && !player.expelled()) {
                 connected++;
 
                 if (player.voted()) {
@@ -183,7 +204,14 @@ public class VotePanel extends JPanel {
 
         progressLabel.setText(voted + "/" + connected + " HANNO VOTATO");
 
-        if (selected != null && cards.containsKey(selected) && !cards.get(selected).player.connected()) {
+        if (meExpelled) {
+            confirmButton.setEnabled(false);
+            skipButton.setEnabled(false);
+            statusLabel.setForeground(Theme.ERROR);
+            statusLabel.setText("Sei stato espulso dalla rete: segui la votazione senza votare.");
+        }
+
+        if (selected != null && cards.containsKey(selected) && cards.get(selected).unavailable()) {
             selected = null;
             confirmButton.setEnabled(false);
         }
@@ -217,7 +245,7 @@ public class VotePanel extends JPanel {
 
                 @Override
                 public void mousePressed(MouseEvent e) {
-                    if (self || !VoteCard.this.player.connected()) {
+                    if (self || unavailable() || meExpelled) {
                         return;
                     }
 
@@ -236,6 +264,10 @@ public class VotePanel extends JPanel {
             }).start();
         }
 
+        boolean unavailable() {
+            return !player.connected() || player.expelled();
+        }
+
         @Override
         protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
@@ -246,7 +278,7 @@ public class VotePanel extends JPanel {
             int h = getHeight();
             double lift = hoverAnim * 3;
             Color color = Theme.playerColor(player.name());
-            boolean disabled = !player.connected();
+            boolean disabled = unavailable();
 
             g2.translate(0, -lift);
 
@@ -281,7 +313,8 @@ public class VotePanel extends JPanel {
             g2.setColor(Theme.MUTED);
             g2.drawString(player.workstation(), ax + avatar + 12, ay + 36);
 
-            String tag = disabled ? "DISCONNESSO" : self ? "TU" : player.name().equals(submitted) ? "IL TUO VOTO" : null;
+            String tag = player.expelled() ? "ESPULSO" : disabled ? "DISCONNESSO" : self ? "TU"
+                    : player.name().equals(submitted) ? "IL TUO VOTO" : null;
 
             if (tag != null) {
                 g2.setFont(Theme.font(9, Font.BOLD));

@@ -39,13 +39,14 @@ public class ResultsOverlay extends JPanel {
             });
         }
 
-        boolean won = result.winner() != null && result.winner() == myRole;
+        boolean won = result.winner() != null && (result.winner() == Role.INSIDER) == (myRole == Role.INSIDER);
+        int scoreRows = result.scores() == null ? 0 : result.scores().size();
 
         UiKit.RoundedPanel card = new UiKit.RoundedPanel(24, new Color(20, 28, 35, 248),
                 Theme.alpha(winnerColor, 150));
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         card.setBorder(new EmptyBorder(30, 40, 28, 40));
-        card.setPreferredSize(new Dimension(900, 680));
+        card.setPreferredSize(new Dimension(900, 640 + (scoreRows == 0 ? 0 : scoreRows * 24 + 36)));
 
         card.add(UiKit.left(UiKit.label("SOC: CONTROL ROOM  ·  ESITO DELLA SESSIONE", 11, Font.BOLD, Theme.STEEL)));
         card.add(Box.createVerticalStrut(14));
@@ -81,7 +82,8 @@ public class ResultsOverlay extends JPanel {
             outcome.add(EvidencePanel.pill(won ? "HAI VINTO" : "HAI PERSO", won ? Theme.GOOD : Theme.ERROR));
         }
 
-        outcome.add(EvidencePanel.pill(myRole == Role.INSIDER ? "ERI L'INSIDER" : "ERI UN ANALISTA",
+        outcome.add(EvidencePanel.pill(myRole == Role.INSIDER ? "ERI L'INSIDER"
+                : myRole == Role.FORENSIC ? "ERI IL FORENSE" : "ERI UN ANALISTA",
                 Theme.accent(myRole)));
 
         if (result.ejected() != null) {
@@ -117,7 +119,14 @@ public class ResultsOverlay extends JPanel {
         columns.add(votes);
         columns.add(stats);
         card.add(columns);
-        card.add(Box.createVerticalStrut(18));
+        card.add(Box.createVerticalStrut(14));
+
+        if (scoreRows > 0) {
+            card.add(UiKit.left(UiKit.label("PUNTEGGI", 10, Font.BOLD, Theme.MUTED)));
+            card.add(Box.createVerticalStrut(6));
+            card.add(createScoreboard(result, nickname));
+            card.add(Box.createVerticalStrut(14));
+        }
 
         card.add(UiKit.left(UiKit.label("COSA HA FATTO L'INSIDER", 10, Font.BOLD, Theme.MUTED)));
         card.add(Box.createVerticalStrut(8));
@@ -149,8 +158,8 @@ public class ResultsOverlay extends JPanel {
         timelineHolder.setBorder(BorderFactory.createLineBorder(Theme.BORDER_SOFT));
         timelineHolder.add(timelineScroll);
         timelineHolder.setAlignmentX(Component.LEFT_ALIGNMENT);
-        timelineHolder.setPreferredSize(new Dimension(800, 150));
-        timelineHolder.setMaximumSize(new Dimension(Integer.MAX_VALUE, 170));
+        timelineHolder.setPreferredSize(new Dimension(800, scoreRows > 0 ? 100 : 150));
+        timelineHolder.setMaximumSize(new Dimension(Integer.MAX_VALUE, scoreRows > 0 ? 120 : 170));
         card.add(timelineHolder);
 
         card.add(Box.createVerticalGlue());
@@ -178,6 +187,42 @@ public class ResultsOverlay extends JPanel {
         add(card);
 
         new Timer(16, e -> repaint()).start();
+    }
+
+    private JPanel createScoreboard(GameResult result, String nickname) {
+        JPanel board = new JPanel(new GridLayout(0, 1, 0, 4));
+        board.setOpaque(false);
+        board.setAlignmentX(Component.LEFT_ALIGNMENT);
+        board.setMaximumSize(new Dimension(Integer.MAX_VALUE, result.scores().size() * 26));
+
+        List<Map.Entry<String, Integer>> sorted = new ArrayList<>(result.scores().entrySet());
+        sorted.sort((a, b) -> Integer.compare(b.getValue(), a.getValue()));
+
+        for (Map.Entry<String, Integer> entry : sorted) {
+            boolean self = entry.getKey().equals(nickname);
+            boolean insider = entry.getKey().equals(result.insider());
+
+            JPanel row = new JPanel(new BorderLayout(14, 0));
+            row.setOpaque(false);
+
+            String name = entry.getKey() + (self ? " (tu)" : "") + (insider ? "  · insider" : "");
+            JLabel nameLabel = UiKit.label(name, 12, Font.BOLD, insider ? Theme.ERROR : self ? Theme.TEXT : Theme.mix(Theme.TEXT, Theme.MUTED, 0.2));
+            nameLabel.setPreferredSize(new Dimension(230, 20));
+
+            String record = result.records() == null ? null : result.records().get(entry.getKey());
+            JLabel recordLabel = new JLabel(record == null ? "" : record);
+            recordLabel.setFont(Theme.mono(11, Font.PLAIN));
+            recordLabel.setForeground(Theme.MUTED);
+
+            JLabel points = UiKit.label("+" + entry.getValue(), 13, Font.BOLD, Theme.GOOD);
+
+            row.add(nameLabel, BorderLayout.WEST);
+            row.add(recordLabel, BorderLayout.CENTER);
+            row.add(points, BorderLayout.EAST);
+            board.add(row);
+        }
+
+        return board;
     }
 
     @Override

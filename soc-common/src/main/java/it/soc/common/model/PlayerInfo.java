@@ -4,5 +4,6 @@ public record PlayerInfo(
         String name,
         String workstation,
         boolean voted,
-        boolean connected
+        boolean connected,
+        boolean expelled
 ) {}

@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package it.soc.server;
 
 import it.soc.common.Message;
@@ -13,7 +9,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ConnectionManager {
 
-    private final ConcurrentHashMap<String, ClientHandler> clients =
+    private final ConcurrentHashMap<String, MessageSink> clients =
             new ConcurrentHashMap<>();
 
     private final ConcurrentHashMap<String, String> playerNames =
@@ -23,7 +19,7 @@ public class ConnectionManager {
             new CopyOnWriteArrayList<>();
 
     // Registra un client e gli assegna un ID univoco
-    public String register(ClientHandler handler) {
+    public String register(MessageSink handler) {
 
         String clientId = UUID.randomUUID().toString();
 
@@ -111,7 +107,7 @@ public class ConnectionManager {
     }
 
     public void sendTo(String clientId, Message message) {
-        ClientHandler handler = clients.get(clientId);
+        MessageSink handler = clients.get(clientId);
 
         if (handler != null) {
             handler.sendMessage(message);
@@ -119,11 +115,17 @@ public class ConnectionManager {
     }
     
     // Invia un messaggio a tutti i client connessi
-    public void broadcast(it.soc.common.Message message) {
+    public void broadcast(Message message) {
 
-        for (ClientHandler client : clients.values()) {
+        for (MessageSink client : clients.values()) {
             client.sendMessage(message);
         }
     }
 
+    public void closeAll() {
+
+        for (MessageSink client : clients.values()) {
+            client.close();
+        }
+    }
 }

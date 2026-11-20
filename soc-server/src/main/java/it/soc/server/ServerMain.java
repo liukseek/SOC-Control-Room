@@ -1,28 +1,18 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package it.soc.server;
 
 import it.soc.common.Protocol;
 import it.soc.server.admin.AdminWindow;
 import it.soc.server.game.GameManager;
 import java.awt.GraphicsEnvironment;
-import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
 import java.util.Arrays;
 
-/**
- *
- * @author luca
- */
 public class ServerMain {
-    
+
     private static final int PORT = Protocol.DEFAULT_PORT;
     private static final ConnectionManager connectionManager = new ConnectionManager();
     private static final GameConfig gameConfig = new GameConfig();
     private static final GameManager gameManager = new GameManager(connectionManager, gameConfig);
+    private static final SocServer server = new SocServer(PORT, connectionManager, gameManager);
 
     public static void main(String[] args) {
 
@@ -31,6 +21,20 @@ public class ServerMain {
 
         boolean gui = !GraphicsEnvironment.isHeadless()
                 && !Arrays.asList(args).contains("--nogui");
+
+        for (String arg : args) {
+            if (arg.startsWith("--difficulty=")) {
+                GameConfig.Difficulty difficulty = GameConfig.Difficulty.parse(arg.substring(13));
+
+                if (difficulty == null) {
+                    System.err.println("Difficoltà non valida: " + arg.substring(13)
+                            + " (usa easy, normal o hard)");
+                    return;
+                }
+
+                gameConfig.setDifficulty(difficulty);
+            }
+        }
 
         for (String arg : args) {
             if (arg.startsWith("--min=")) {
@@ -46,34 +50,10 @@ public class ServerMain {
             AdminWindow.open(gameManager, connectionManager, PORT);
         }
 
-        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
+        server.run();
+    }
 
-            ServerLog.info("Server in ascolto sulla porta " + PORT);
-
-            while (true) {
-    Socket clientSocket = serverSocket.accept();
-
-    ServerLog.info(
-            "Nuovo client connesso: "
-            + clientSocket.getInetAddress()
-    );
-
-    ClientHandler handler = new ClientHandler(
-        clientSocket,
-        connectionManager,
-        gameManager
-    );
-    Thread clientThread = new Thread(handler);
-
-    clientThread.start();
-    ServerLog.info(
-        "Client attualmente connessi: "
-        + connectionManager.getClientCount()
-);
-}
-
-        } catch (IOException e) {
-            ServerLog.error("Errore durante l'avvio del server: " + e.getMessage());
-        }
+    public static void shutdown() {
+        server.shutdown();
     }
 }

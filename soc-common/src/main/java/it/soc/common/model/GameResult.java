@@ -12,5 +12,7 @@ public record GameResult(
         int exfiltration,
         int evidenceCollected,
         int evidenceShared,
-        List<String> insiderLog
+        List<String> insiderLog,
+        Map<String, Integer> scores,
+        Map<String, String> records
 ) {}

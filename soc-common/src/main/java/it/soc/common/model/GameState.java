@@ -10,5 +10,12 @@ public record GameState(
         int exfiltration,
         List<SystemNode> systems,
         List<PlayerInfo> players,
-        Map<ActionType, Integer> cooldowns
+        Map<ActionType, Integer> cooldowns,
+        int blocked,
+        int blockLimit,
+        List<String> objectives,
+        boolean emergency,
+        int callVotes,
+        int callVotesNeeded,
+        boolean canCallVote
 ) {}
