@@ -35,6 +35,7 @@ public class AdminWindow extends JFrame {
     private static final Color GOOD = new Color(137, 181, 169);
     private static final Color WARN = new Color(214, 178, 110);
     private static final Color DANGER = new Color(220, 120, 105);
+    private static final int RADIUS = 12;
 
     private final GameManager gameManager;
     private final ConnectionManager connectionManager;
@@ -51,7 +52,14 @@ public class AdminWindow extends JFrame {
     private final JButton startButton = new JButton("AVVIA PARTITA");
     private final JButton stopButton = new JButton("TERMINA PARTITA");
     private final JButton shutdownButton = new JButton("ARRESTA SERVER");
-    private final JComboBox<GameConfig.Difficulty> difficultyBox = new JComboBox<>(GameConfig.Difficulty.values());
+    private final JComboBox<GameConfig.Difficulty> difficultyBox = new JComboBox<>(GameConfig.Difficulty.values()) {
+        @Override
+        public void paint(Graphics g) {
+            paintRoundedBackground(g, this);
+            super.paint(g);
+            paintRoundedOutline(g, this);
+        }
+    };
 
     private String lastPlayersKey = "";
 
@@ -62,7 +70,7 @@ public class AdminWindow extends JFrame {
 
         setTitle("SOC: CONTROL ROOM - Pannello amministratore");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(1180, 760);
+        setSize(1180, 780);
         setMinimumSize(new Dimension(980, 640));
         setLocationRelativeTo(null);
 
@@ -171,7 +179,7 @@ public class AdminWindow extends JFrame {
         card.add(left(label("Sessione", 21, Font.BOLD, TEXT)));
         card.add(Box.createVerticalStrut(4));
         card.add(left(label("Stato della partita in corso", 12, Font.PLAIN, MUTED)));
-        card.add(Box.createVerticalStrut(22));
+        card.add(Box.createVerticalStrut(16));
 
         JPanel stats = new JPanel(new GridLayout(2, 2, 10, 10));
         stats.setOpaque(false);
@@ -189,14 +197,14 @@ public class AdminWindow extends JFrame {
         stats.add(stat("HOST", hostLabel));
 
         card.add(stats);
-        card.add(Box.createVerticalStrut(20));
+        card.add(Box.createVerticalStrut(14));
         card.add(left(label("DATI ESFILTRATI", 10, Font.BOLD, MUTED)));
         card.add(Box.createVerticalStrut(8));
 
         exfiltrationMeter.setAlignmentX(Component.LEFT_ALIGNMENT);
         card.add(exfiltrationMeter);
 
-        card.add(Box.createVerticalStrut(22));
+        card.add(Box.createVerticalStrut(16));
         card.add(left(label("CONFIGURAZIONE", 10, Font.BOLD, MUTED)));
         card.add(Box.createVerticalStrut(10));
 
@@ -205,20 +213,20 @@ public class AdminWindow extends JFrame {
         JSpinner[] investigationSpinner = new JSpinner[1];
 
         card.add(configRow("Giocatori minimi", config.minPlayers(), 2, 12, 1, config::setMinPlayers));
-        card.add(Box.createVerticalStrut(8));
+        card.add(Box.createVerticalStrut(4));
         card.add(difficultyRow(config, investigationSpinner));
-        card.add(Box.createVerticalStrut(8));
+        card.add(Box.createVerticalStrut(4));
 
         JPanel investigationRow = configRow("Indagine (s)", config.investigationSeconds(), 30, 900, 30,
                 config::setInvestigationSeconds);
         investigationSpinner[0] = (JSpinner) investigationRow.getComponent(1);
 
         card.add(investigationRow);
-        card.add(Box.createVerticalStrut(8));
+        card.add(Box.createVerticalStrut(4));
         card.add(configRow("Voto (s)", config.votingSeconds(), 15, 300, 15, config::setVotingSeconds));
 
         card.add(Box.createVerticalGlue());
-        card.add(Box.createVerticalStrut(18));
+        card.add(Box.createVerticalStrut(14));
 
         styleButton(startButton, STEEL, new Color(145, 169, 185), new Color(20, 29, 36));
         styleButton(stopButton, new Color(125, 75, 66), new Color(153, 88, 76), Color.WHITE);
@@ -248,9 +256,9 @@ public class AdminWindow extends JFrame {
         });
 
         card.add(startButton);
-        card.add(Box.createVerticalStrut(10));
+        card.add(Box.createVerticalStrut(8));
         card.add(stopButton);
-        card.add(Box.createVerticalStrut(10));
+        card.add(Box.createVerticalStrut(8));
         card.add(shutdownButton);
 
         return card;
@@ -263,15 +271,7 @@ public class AdminWindow extends JFrame {
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
 
         difficultyBox.setSelectedItem(config.difficulty());
-        difficultyBox.setPreferredSize(new Dimension(110, 30));
-        difficultyBox.setRenderer(new DefaultListCellRenderer() {
-            @Override
-            public Component getListCellRendererComponent(JList<?> list, Object value, int index,
-                                                          boolean selected, boolean focus) {
-                return super.getListCellRendererComponent(list,
-                        value instanceof GameConfig.Difficulty d ? d.label() : value, index, selected, focus);
-            }
-        });
+        styleDifficultyBox();
 
         difficultyBox.addActionListener(e -> {
             GameConfig.Difficulty chosen = (GameConfig.Difficulty) difficultyBox.getSelectedItem();
@@ -291,6 +291,172 @@ public class AdminWindow extends JFrame {
         return row;
     }
 
+    private static void stepSpinner(JButton button, boolean up) {
+        JSpinner spinner = (JSpinner) SwingUtilities.getAncestorOfClass(JSpinner.class, button);
+
+        if (spinner == null) {
+            return;
+        }
+
+        Object value = up ? spinner.getNextValue() : spinner.getPreviousValue();
+
+        if (value != null) {
+            spinner.setValue(value);
+        }
+    }
+
+    private static void paintRoundedBackground(Graphics g, JComponent component) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setColor(PANEL_LIGHT);
+        g2.fill(new RoundRectangle2D.Double(0, 0, component.getWidth(), component.getHeight(), RADIUS, RADIUS));
+        g2.dispose();
+    }
+
+    private static void paintRoundedOutline(Graphics g, JComponent component) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setColor(BORDER);
+        g2.draw(new RoundRectangle2D.Double(0.5, 0.5, component.getWidth() - 1, component.getHeight() - 1,
+                RADIUS, RADIUS));
+        g2.dispose();
+    }
+
+    private static JButton flatArrow(boolean up) {
+        JButton button = new JButton() {
+            private boolean hovered;
+
+            {
+                addMouseListener(new MouseAdapter() {
+                    @Override
+                    public void mouseEntered(MouseEvent e) {
+                        hovered = true;
+                        repaint();
+                    }
+
+                    @Override
+                    public void mouseExited(MouseEvent e) {
+                        hovered = false;
+                        repaint();
+                    }
+                });
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int cx = getWidth() / 2;
+                int cy = getHeight() / 2 + (getModel().isPressed() ? 1 : 0);
+                g2.setColor(hovered ? TEXT : MUTED);
+
+                if (up) {
+                    g2.fillPolygon(new int[]{cx - 4, cx + 4, cx}, new int[]{cy + 2, cy + 2, cy - 2}, 3);
+                } else {
+                    g2.fillPolygon(new int[]{cx - 4, cx + 4, cx}, new int[]{cy - 2, cy - 2, cy + 2}, 3);
+                }
+
+                g2.dispose();
+            }
+        };
+
+        javax.swing.Timer repeat = new javax.swing.Timer(70, null);
+        repeat.setInitialDelay(380);
+        repeat.addActionListener(e -> stepSpinner(button, up));
+
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                if (SwingUtilities.isLeftMouseButton(e) && button.isEnabled()) {
+                    stepSpinner(button, up);
+                    repeat.start();
+                }
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                repeat.stop();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                repeat.stop();
+            }
+        });
+
+        button.setName(up ? "Spinner.nextButton" : "Spinner.previousButton");
+        button.setBorder(new EmptyBorder(0, 0, 0, 0));
+        button.setFocusPainted(false);
+        button.setContentAreaFilled(false);
+        button.setPreferredSize(new Dimension(22, 14));
+        return button;
+    }
+
+    private void styleDifficultyBox() {
+        Font font = new Font("Arial", Font.BOLD, 13);
+
+        difficultyBox.setFont(font);
+        difficultyBox.setBackground(PANEL_LIGHT);
+        difficultyBox.setForeground(TEXT);
+        difficultyBox.setOpaque(false);
+        difficultyBox.setBorder(new EmptyBorder(1, 1, 1, 1));
+        difficultyBox.setPreferredSize(new Dimension(110, 28));
+        difficultyBox.setMinimumSize(new Dimension(110, 28));
+        difficultyBox.setFocusable(false);
+        difficultyBox.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+        difficultyBox.setUI(new javax.swing.plaf.basic.BasicComboBoxUI() {
+            @Override
+            protected JButton createArrowButton() {
+                JButton button = new JButton() {
+                    @Override
+                    protected void paintComponent(Graphics g) {
+                        Graphics2D g2 = (Graphics2D) g.create();
+                        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                        int cx = getWidth() / 2;
+                        int cy = getHeight() / 2;
+                        g2.setColor(MUTED);
+                        g2.fillPolygon(new int[]{cx - 4, cx + 4, cx}, new int[]{cy - 2, cy - 2, cy + 2}, 3);
+                        g2.dispose();
+                    }
+                };
+
+                button.setBorder(new EmptyBorder(0, 0, 0, 0));
+                button.setFocusPainted(false);
+                button.setContentAreaFilled(false);
+                button.setPreferredSize(new Dimension(22, 28));
+                return button;
+            }
+
+            @Override
+            public void paintCurrentValueBackground(Graphics g, Rectangle bounds, boolean hasFocus) {
+            }
+        });
+
+        difficultyBox.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+                                                          boolean selected, boolean focus) {
+                JLabel cell = (JLabel) super.getListCellRendererComponent(list,
+                        value instanceof GameConfig.Difficulty d ? d.label() : value, index, selected, focus);
+
+                cell.setFont(font);
+                cell.setForeground(TEXT);
+                cell.setBackground(selected ? new Color(49, 67, 80) : PANEL_LIGHT);
+                cell.setOpaque(index >= 0);
+                cell.setBorder(new EmptyBorder(5, 8, 5, 8));
+                return cell;
+            }
+        });
+
+        Object popup = difficultyBox.getUI().getAccessibleChild(difficultyBox, 0);
+
+        if (popup instanceof JComponent component) {
+            component.setBorder(BorderFactory.createLineBorder(BORDER));
+        }
+    }
+
     private JPanel configRow(String text, int value, int min, int max, int step,
                              java.util.function.IntConsumer setter) {
         JPanel row = new JPanel(new BorderLayout());
@@ -298,19 +464,41 @@ public class AdminWindow extends JFrame {
         row.setAlignmentX(Component.LEFT_ALIGNMENT);
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
 
-        JSpinner spinner = new JSpinner(new SpinnerNumberModel(value, min, max, step));
-        spinner.setPreferredSize(new Dimension(80, 30));
-        spinner.setBorder(BorderFactory.createLineBorder(BORDER));
+        JSpinner spinner = new JSpinner(new SpinnerNumberModel(value, min, max, step)) {
+            @Override
+            public void paint(Graphics g) {
+                paintRoundedBackground(g, this);
+                super.paint(g);
+                paintRoundedOutline(g, this);
+            }
+        };
+        spinner.setUI(new javax.swing.plaf.basic.BasicSpinnerUI() {
+            @Override
+            protected Component createNextButton() {
+                return flatArrow(true);
+            }
+
+            @Override
+            protected Component createPreviousButton() {
+                return flatArrow(false);
+            }
+        });
+        spinner.setPreferredSize(new Dimension(80, 28));
+        spinner.setMinimumSize(new Dimension(80, 28));
+        spinner.setOpaque(false);
+        spinner.setBorder(new EmptyBorder(1, 1, 1, 1));
 
         JComponent editor = spinner.getEditor();
+        editor.setOpaque(false);
 
         if (editor instanceof JSpinner.DefaultEditor defaultEditor) {
             JTextField field = defaultEditor.getTextField();
+            field.setOpaque(false);
             field.setBackground(PANEL_LIGHT);
             field.setForeground(TEXT);
             field.setCaretColor(TEXT);
-            field.setFont(new Font("Monospaced", Font.BOLD, 13));
-            field.setBorder(new EmptyBorder(0, 8, 0, 4));
+            field.setFont(new Font("Arial", Font.BOLD, 13));
+            field.setBorder(new EmptyBorder(0, 8, 0, 8));
         }
 
         spinner.addChangeListener(e -> setter.accept((Integer) spinner.getValue()));
@@ -560,13 +748,35 @@ public class AdminWindow extends JFrame {
         button.setFont(new Font("Arial", Font.BOLD, 12));
         button.setForeground(foreground);
         button.setBackground(normal);
-        button.setOpaque(true);
-        button.setContentAreaFilled(true);
+        button.setOpaque(false);
+        button.setContentAreaFilled(false);
         button.setBorderPainted(false);
         button.setFocusPainted(false);
+        button.setUI(new javax.swing.plaf.basic.BasicButtonUI() {
+            @Override
+            public void paint(Graphics g, JComponent component) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(component.getBackground());
+                g2.fill(new RoundRectangle2D.Double(0, 0, component.getWidth(), component.getHeight(),
+                        RADIUS, RADIUS));
+                g2.dispose();
+                super.paint(g, component);
+            }
+
+            @Override
+            protected void paintText(Graphics g, AbstractButton b, Rectangle textRect, String text) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                g2.setFont(b.getFont());
+                g2.setColor(b.isEnabled() ? b.getForeground() : new Color(236, 214, 208, 165));
+                g2.drawString(text, textRect.x, textRect.y + g2.getFontMetrics().getAscent());
+                g2.dispose();
+            }
+        });
         button.setAlignmentX(Component.LEFT_ALIGNMENT);
-        button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
-        button.setPreferredSize(new Dimension(240, 44));
+        button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        button.setPreferredSize(new Dimension(240, 40));
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
         button.addMouseListener(new MouseAdapter() {
